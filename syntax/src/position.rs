@@ -30,10 +30,11 @@ impl<'a> fmt::Display for Position<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Position::Dummy => "-".fmt(f),
-            Position::FilePos { filename, line, column, .. } =>
-            match filename {
-                None => write!(f, "{}:{}", line, column),
-                Some(name) => write!(f, "{}:{}:{}", name, line, column),
+            Position::FilePos { filename, line, column, .. } => {
+                match filename {
+                    None => write!(f, "{}:{}", line, column),
+                    Some(name) => write!(f, "{}:{}:{}", name, line, column),
+                }
             }
         }
     }
@@ -86,8 +87,7 @@ impl<'a> File<'a> {
 
     /// Annotate new line.
     pub fn add_line(&mut self, offset: usize) {
-        let last = self.lines.len(); // self.lines always contains at least 1 element.
-        debug_assert!(self.lines[last] < offset);
+        debug_assert!(self.lines[self.lines.len() - 1] < offset); // self.lines always contains at least 1 element.
         debug_assert!(offset < self.size);
         self.lines.push(offset);
     }
@@ -128,5 +128,32 @@ impl<'a> File<'a> {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn test_position() {
+    let mut file = File::new(Some("test"), 30);
+    let heads = &[10, 15, 20];
+    for &head in heads {
+        file.add_line(head);
+    }
+    let tests = vec![
+        // offset, expected line, expected column
+        (0, 1, 1),
+        (1, 1, 2),
+        (10, 2, 1),
+        (11, 2, 2),
+        (15, 3, 1),
+        (16, 3, 2),
+        (29, 4, 10),
+    ];
+
+    for (offset, expected_line, expected_column) in tests {
+        let pos = file.pos(offset);
+        let position = file.position(pos);
+        assert!(position.is_valid());
+        assert_eq!(format!("test:{}:{}", expected_line, expected_column),
+                   format!("{}", position));
     }
 }
