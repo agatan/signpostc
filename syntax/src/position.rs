@@ -84,6 +84,15 @@ impl<'a> File<'a> {
         self.lines.len()
     }
 
+    /// Annotate new line.
+    pub fn add_line(&mut self, offset: usize) {
+        let last = self.lines.len(); // self.lines always contains at least 1 element.
+        debug_assert!(self.lines[last] < offset);
+        debug_assert!(offset < self.size);
+        self.lines.push(offset);
+    }
+
+    /// returns the compact representation of the offset.
     pub fn pos(&self, offset: usize) -> Pos {
         debug_assert!(offset <= self.size);
         Pos(Some(offset))
@@ -103,6 +112,7 @@ impl<'a> File<'a> {
         self.lines.len() - 1
     }
 
+    /// returns the corresponding position of `pos`.
     pub fn position(&self, pos: Pos) -> Position<'a> {
         match pos.0 {
             None => Position::Dummy,
