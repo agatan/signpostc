@@ -72,19 +72,20 @@ impl<'a> Scanner<'a> {
         self.skip_whitespace();
 
         let offset = self.offset;
+        let pos = self.file.pos(self.offset);
 
         if self.is_eof() {
-            Token::new(TokenKind::EOF, "")
+            Token::new(pos, TokenKind::EOF, "")
         } else if self.ch.is_alphabetic() {
             let is_lowercase = self.ch.is_lowercase();
-            self.scan_identifier(is_lowercase)
+            self.scan_identifier(offset, is_lowercase)
         } else {
-            Token::new(TokenKind::Error, &self.src[offset..self.offset])
+            Token::new(pos, TokenKind::Error, &self.src[offset..self.offset])
         }
     }
 
-    fn scan_identifier(&mut self, is_lowercase: bool) -> Token {
-        let offset = self.offset;
+    fn scan_identifier(&mut self, offset: usize, is_lowercase: bool) -> Token {
+        let pos = self.file.pos(offset);
         self.take_while(|c| c.is_alphabetic());
         let src = &self.src[offset..self.offset];
 
@@ -93,7 +94,7 @@ impl<'a> Scanner<'a> {
         } else {
             TokenKind::Uident
         };
-        Token::new(kind, src)
+        Token::new(pos, kind, src)
     }
 }
 
@@ -102,7 +103,7 @@ mod tests {
     use super::*;
     use errors::*;
     use position::*;
-    use token::{Token, TokenKind};
+    use token::TokenKind;
 
     #[test]
     fn test_next_token() {
@@ -119,7 +120,9 @@ mod tests {
         let mut sc = Scanner::new(file, input, &errors);
 
         for (expected_kind, expected_lit) in tests {
-            assert_eq!(Token::new(expected_kind, expected_lit), sc.scan());
+            let tok = sc.scan();
+            assert_eq!(expected_kind, tok.kind());
+            assert_eq!(expected_lit, tok.literal());
         }
     }
 }

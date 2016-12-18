@@ -1,16 +1,24 @@
+use position::Pos;
+
 /// represents tokens of source code.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Token<'a> {
+    pos: Pos,
     kind: TokenKind,
     literal: &'a str,
 }
 
 impl<'a> Token<'a> {
-    pub fn new(kind: TokenKind, literal: &'a str) -> Self {
+    pub fn new(pos: Pos, kind: TokenKind, literal: &'a str) -> Self {
         Token {
+            pos: pos,
             kind: kind,
             literal: literal,
         }
+    }
+
+    pub fn pos(&self) -> Pos {
+        self.pos
     }
 
     pub fn kind(&self) -> TokenKind {
