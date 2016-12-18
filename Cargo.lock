@@ -1,4 +1,11 @@
 [root]
 name = "signpostc"
 version = "0.1.0"
+dependencies = [
+ "signpostc_syntax 0.1.0",
+]
+
+[[package]]
+name = "signpostc_syntax"
+version = "0.1.0"
 
