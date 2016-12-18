@@ -19,7 +19,7 @@ pub struct Scanner<'a> {
 
 impl<'a> Scanner<'a> {
     pub fn new(file: File<'a>, src: &'a str, errors: &'a ErrorList<'a>) -> Self {
-        let mut sc = Scanner{
+        let mut sc = Scanner {
             file: file,
             src: src,
             errors: errors,
@@ -80,23 +80,26 @@ impl<'a> Scanner<'a> {
 
         if self.is_eof() {
             Token::new(pos, TokenKind::EOF, "")
+        } else if is_operator(self.ch) {
+            self.scan_operator()
         } else if self.ch.is_alphabetic() {
-            let is_lowercase = self.ch.is_lowercase();
-            self.scan_identifier(offset, is_lowercase)
+            self.scan_identifier()
         } else {
             let ch = self.ch;
             self.next();
             match ch {
                 ':' => Token::new(pos, TokenKind::Colon, self.substr_from(offset)),
-                _ => Token::new(pos, TokenKind::Error, self.substr_from(offset))
+                _ => Token::new(pos, TokenKind::Error, self.substr_from(offset)),
             }
         }
     }
 
-    fn scan_identifier(&mut self, offset: usize, is_lowercase: bool) -> Token {
+    fn scan_identifier(&mut self) -> Token {
+        let offset = self.offset;
+        let is_lowercase = self.ch.is_lowercase();
         let pos = self.file.pos(offset);
         self.take_while(|c| c.is_alphabetic());
-        let src = &self.src[offset..self.offset];
+        let src = self.substr_from(offset);
 
         let kind = if is_lowercase {
             TokenKind::lookup(src)
@@ -105,6 +108,23 @@ impl<'a> Scanner<'a> {
         };
         Token::new(pos, kind, src)
     }
+
+    fn scan_operator(&mut self) -> Token {
+        let offset = self.offset;
+        let pos = self.file.pos(offset);
+        self.take_while(is_operator);
+        let src = self.substr_from(offset);
+        let kind = TokenKind::lookup_operator(src);
+        Token::new(pos, kind, src)
+    }
+}
+
+fn is_prefix_operator(c: char) -> bool {
+    "!-@".chars().any(|x| x == c)
+}
+
+fn is_operator(c: char) -> bool {
+    "!@$%^&*-+=?<>/|~".chars().any(|x| x == c)
 }
 
 #[cfg(test)]
@@ -117,7 +137,7 @@ mod tests {
     #[test]
     fn test_next_token() {
         let input = r#"
-            let ten: Int
+            let ten: Int =
         "#;
         let tests = vec![
             // token type, literal
@@ -125,6 +145,7 @@ mod tests {
             (TokenKind::Ident, "ten"),
             (TokenKind::Colon, ":"),
             (TokenKind::Uident, "Int"),
+            (TokenKind::Eq, "="),
             (TokenKind::EOF, ""),
         ];
         let file = File::new(Some("test"), input.len());
