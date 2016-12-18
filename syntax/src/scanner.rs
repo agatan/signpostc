@@ -84,14 +84,26 @@ impl<'a> Scanner<'a> {
             self.scan_operator()
         } else if self.ch.is_alphabetic() {
             self.scan_identifier()
+        } else if self.ch.is_digit(10) {
+            self.scan_number()
         } else {
             let ch = self.ch;
             self.next();
             match ch {
                 ':' => Token::new(pos, TokenKind::Colon, self.substr_from(offset)),
+                ';' => Token::new(pos, TokenKind::Semicolon, self.substr_from(offset)),
                 _ => Token::new(pos, TokenKind::Error, self.substr_from(offset)),
             }
         }
+    }
+
+    fn scan_operator(&mut self) -> Token {
+        let offset = self.offset;
+        let pos = self.file.pos(offset);
+        self.take_while(is_operator);
+        let src = self.substr_from(offset);
+        let kind = TokenKind::lookup_operator(src);
+        Token::new(pos, kind, src)
     }
 
     fn scan_identifier(&mut self) -> Token {
@@ -109,13 +121,12 @@ impl<'a> Scanner<'a> {
         Token::new(pos, kind, src)
     }
 
-    fn scan_operator(&mut self) -> Token {
+    fn scan_number(&mut self) -> Token {
         let offset = self.offset;
         let pos = self.file.pos(offset);
-        self.take_while(is_operator);
+        self.take_while(|c| c.is_digit(10));
         let src = self.substr_from(offset);
-        let kind = TokenKind::lookup_operator(src);
-        Token::new(pos, kind, src)
+        Token::new(pos, TokenKind::Int, src)
     }
 }
 
@@ -137,7 +148,7 @@ mod tests {
     #[test]
     fn test_next_token() {
         let input = r#"
-            let ten: Int =
+            let ten: Int = 10;
         "#;
         let tests = vec![
             // token type, literal
@@ -146,6 +157,8 @@ mod tests {
             (TokenKind::Colon, ":"),
             (TokenKind::Uident, "Int"),
             (TokenKind::Eq, "="),
+            (TokenKind::Int, "10"),
+            (TokenKind::Semicolon, ";"),
             (TokenKind::EOF, ""),
         ];
         let file = File::new(Some("test"), input.len());
