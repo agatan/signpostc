@@ -1,8 +1,8 @@
 /// represents tokens of source code.
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Token<'a> {
-    pub kind: TokenKind,
-    pub literal: &'a str,
+    kind: TokenKind,
+    literal: &'a str,
 }
 
 impl<'a> Token<'a> {
@@ -11,6 +11,18 @@ impl<'a> Token<'a> {
             kind: kind,
             literal: literal,
         }
+    }
+
+    pub fn kind(&self) -> TokenKind {
+        self.kind
+    }
+
+    pub fn has_kind(&self, kind: TokenKind) -> bool {
+        self.kind == kind
+    }
+
+    pub fn literal(&self) -> &str {
+        self.literal
     }
 }
 
