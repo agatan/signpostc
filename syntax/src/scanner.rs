@@ -1,4 +1,5 @@
 //! `scanner` module implements the lexer phase of the language.
+use token::{Token, TokenKind};
 use errors::ErrorList;
 use position::File;
 
@@ -57,10 +58,42 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn skip_whitespace(&mut self) {
-        while self.ch == ' ' || self.ch == '\t' || self.ch == '\n' || self.ch == '\r' || self.is_eof() {
+    fn take_while<F: Fn(char) -> bool>(&mut self, f: F) {
+        while !self.is_eof() && f(self.ch) {
             self.next();
         }
+    }
+
+    fn skip_whitespace(&mut self) {
+        self.take_while(|c| c.is_whitespace());
+    }
+
+    pub fn scan(&mut self) -> Token {
+        self.skip_whitespace();
+
+        let offset = self.offset;
+
+        if self.is_eof() {
+            Token::new(TokenKind::EOF, "")
+        } else if self.ch.is_alphabetic() {
+            let is_lowercase = self.ch.is_lowercase();
+            self.scan_identifier(is_lowercase)
+        } else {
+            Token::new(TokenKind::Error, &self.src[offset..self.offset])
+        }
+    }
+
+    fn scan_identifier(&mut self, is_lowercase: bool) -> Token {
+        let offset = self.offset;
+        self.take_while(|c| c.is_alphabetic());
+        let src = &self.src[offset..self.offset];
+
+        let kind = if is_lowercase {
+            TokenKind::lookup(src)
+        } else {
+            TokenKind::Uident
+        };
+        Token::new(kind, src)
     }
 }
 
@@ -69,7 +102,7 @@ mod tests {
     use super::*;
     use errors::*;
     use position::*;
-    use token::TokenKind;
+    use token::{Token, TokenKind};
 
     #[test]
     fn test_next_token() {
@@ -79,9 +112,14 @@ mod tests {
         let tests = vec![
             // token type, literal
             (TokenKind::Let, "let"),
+            (TokenKind::EOF, ""),
         ];
         let file = File::new(Some("test"), input.len());
         let errors = ErrorList::new();
-        let sc = Scanner::new(file, input, &errors);
+        let mut sc = Scanner::new(file, input, &errors);
+
+        for (expected_kind, expected_lit) in tests {
+            assert_eq!(Token::new(expected_kind, expected_lit), sc.scan());
+        }
     }
 }
