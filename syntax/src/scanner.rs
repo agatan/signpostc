@@ -90,8 +90,15 @@ impl<'a> Scanner<'a> {
             let ch = self.ch;
             self.next();
             match ch {
+                ',' => Token::new(pos, TokenKind::Comma, self.substr_from(offset)),
                 ':' => Token::new(pos, TokenKind::Colon, self.substr_from(offset)),
                 ';' => Token::new(pos, TokenKind::Semicolon, self.substr_from(offset)),
+                '(' => Token::new(pos, TokenKind::Lparen, self.substr_from(offset)),
+                ')' => Token::new(pos, TokenKind::Rparen, self.substr_from(offset)),
+                '{' => Token::new(pos, TokenKind::Lbrace, self.substr_from(offset)),
+                '}' => Token::new(pos, TokenKind::Rbrace, self.substr_from(offset)),
+                '[' => Token::new(pos, TokenKind::Lbrack, self.substr_from(offset)),
+                ']' => Token::new(pos, TokenKind::Rbrack, self.substr_from(offset)),
                 _ => Token::new(pos, TokenKind::Error, self.substr_from(offset)),
             }
         }
@@ -149,6 +156,20 @@ mod tests {
     fn test_next_token() {
         let input = r#"
             let ten: Int = 10;
+            let five: Int = 5;
+
+            def identity(x: Int) -> Int {
+                return x;
+            }
+            if true {
+                1
+            } else {
+                2
+            }
+            match true {
+                true => 1,
+                false => 2,
+            }
         "#;
         let tests = vec![
             // token type, literal
@@ -159,6 +180,53 @@ mod tests {
             (TokenKind::Eq, "="),
             (TokenKind::Int, "10"),
             (TokenKind::Semicolon, ";"),
+
+            (TokenKind::Let, "let"),
+            (TokenKind::Ident, "five"),
+            (TokenKind::Colon, ":"),
+            (TokenKind::Uident, "Int"),
+            (TokenKind::Eq, "="),
+            (TokenKind::Int, "5"),
+            (TokenKind::Semicolon, ";"),
+
+            (TokenKind::Def, "def"),
+            (TokenKind::Ident, "identity"),
+            (TokenKind::Lparen, "("),
+            (TokenKind::Ident, "x"),
+            (TokenKind::Colon, ":"),
+            (TokenKind::Uident, "Int"),
+            (TokenKind::Rparen, ")"),
+            (TokenKind::Arrow, "->"),
+            (TokenKind::Uident, "Int"),
+            (TokenKind::Lbrace, "{"),
+            (TokenKind::Return, "return"),
+            (TokenKind::Ident, "x"),
+            (TokenKind::Semicolon, ";"),
+            (TokenKind::Rbrace, "}"),
+
+            (TokenKind::If, "if"),
+            (TokenKind::True, "true"),
+            (TokenKind::Lbrace, "{"),
+            (TokenKind::Int, "1"),
+            (TokenKind::Rbrace, "}"),
+            (TokenKind::Else, "else"),
+            (TokenKind::Lbrace, "{"),
+            (TokenKind::Int, "2"),
+            (TokenKind::Rbrace, "}"),
+
+            (TokenKind::Match, "match"),
+            (TokenKind::True, "true"),
+            (TokenKind::Lbrace, "{"),
+            (TokenKind::True, "true"),
+            (TokenKind::FatArrow, "=>"),
+            (TokenKind::Int, "1"),
+            (TokenKind::Comma, ","),
+            (TokenKind::False, "false"),
+            (TokenKind::FatArrow, "=>"),
+            (TokenKind::Int, "2"),
+            (TokenKind::Comma, ","),
+            (TokenKind::Rbrace, "}"),
+
             (TokenKind::EOF, ""),
         ];
         let file = File::new(Some("test"), input.len());
