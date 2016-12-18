@@ -68,6 +68,10 @@ impl<'a> Scanner<'a> {
         self.take_while(|c| c.is_whitespace());
     }
 
+    fn substr_from(&self, offset: usize) -> &str {
+        &self.src[offset..self.offset]
+    }
+
     pub fn scan(&mut self) -> Token {
         self.skip_whitespace();
 
@@ -80,7 +84,12 @@ impl<'a> Scanner<'a> {
             let is_lowercase = self.ch.is_lowercase();
             self.scan_identifier(offset, is_lowercase)
         } else {
-            Token::new(pos, TokenKind::Error, &self.src[offset..self.offset])
+            let ch = self.ch;
+            self.next();
+            match ch {
+                ':' => Token::new(pos, TokenKind::Colon, self.substr_from(offset)),
+                _ => Token::new(pos, TokenKind::Error, self.substr_from(offset))
+            }
         }
     }
 
@@ -108,11 +117,14 @@ mod tests {
     #[test]
     fn test_next_token() {
         let input = r#"
-            let
+            let ten: Int
         "#;
         let tests = vec![
             // token type, literal
             (TokenKind::Let, "let"),
+            (TokenKind::Ident, "ten"),
+            (TokenKind::Colon, ":"),
+            (TokenKind::Uident, "Int"),
             (TokenKind::EOF, ""),
         ];
         let file = File::new(Some("test"), input.len());
