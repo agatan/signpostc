@@ -1,16 +1,21 @@
 use std::fmt;
 
+/// `SourcePos` represents a source position that contains byte offset, line number and column
+/// number.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct SourcePos {
+    pub line: usize, // starting at 1. if 0, the position is dummy.
+    pub column: usize, // byte offset from the head of the line, starting at 1
+    pub offset: usize, // byte offset from the head of the file, starting at 0
+}
+
+
 /// `Position` represents a source position including file name, line number, column number and
 /// byte offset.
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Position<'a> {
     Dummy,
-    FilePos {
-        filename: Option<&'a str>, // None if the source is stdin.
-        line: usize, // starting at 1. if 0, the position is dummy.
-        column: usize, // byte offset from the head of the line, starting at 1
-        offset: usize, // byte offset from the head of the file, starting at 0
-    },
+    File(Option<&'a str>, SourcePos),
 }
 
 impl<'a> Position<'a> {
@@ -24,13 +29,20 @@ impl<'a> Position<'a> {
             _ => true,
         }
     }
+
+    pub fn source_position(&self) -> Option<SourcePos> {
+        match *self {
+            Position::Dummy => None,
+            Position::File(_, sp) => Some(sp),
+        }
+    }
 }
 
 impl<'a> fmt::Display for Position<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Position::Dummy => "-".fmt(f),
-            Position::FilePos { filename, line, column, .. } => {
+            Position::File(filename, SourcePos { line, column, .. }) => {
                 match filename {
                     None => write!(f, "{}:{}", line, column),
                     Some(name) => write!(f, "{}:{}:{}", name, line, column),
@@ -120,12 +132,12 @@ impl<'a> File<'a> {
                 let i = self.search_line(bs);
                 let line = i + 1;
                 let column = bs - self.lines[i] + 1;
-                Position::FilePos {
-                    filename: self.name,
-                    line: line,
-                    column: column,
-                    offset: bs,
-                }
+                Position::File(self.name,
+                               SourcePos {
+                                   line: line,
+                                   column: column,
+                                   offset: bs,
+                               })
             }
         }
     }
@@ -153,6 +165,10 @@ fn test_position() {
         let pos = file.pos(offset);
         let position = file.position(pos);
         assert!(position.is_valid());
+        let source_position = position.source_position().unwrap();
+        assert_eq!(expected_line, source_position.line);
+        assert_eq!(expected_column, source_position.column);
+        assert_eq!(offset, source_position.offset);
         assert_eq!(format!("test:{}:{}", expected_line, expected_column),
                    format!("{}", position));
     }
