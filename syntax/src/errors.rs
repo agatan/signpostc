@@ -32,6 +32,12 @@ pub struct ErrorList<'a> {
 }
 
 impl<'a> ErrorList<'a> {
+    pub fn new() -> Self {
+        ErrorList {
+            errors: RefCell::default(),
+        }
+    }
+
     pub fn add(&self, position: Position<'a>, msg: String) {
         self.errors.borrow_mut().push(Error { position: position, message: msg })
     }
