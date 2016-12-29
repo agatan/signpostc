@@ -37,6 +37,10 @@ impl<'a> Scanner<'a> {
         sc
     }
 
+    pub fn file(&self) -> &File {
+        &self.file
+    }
+
     fn error(&mut self, offset: usize, msg: String) {
         self.errors.borrow_mut().add(self.file.position(self.file.pos(offset)), msg);
         self.error_count += 1;

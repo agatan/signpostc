@@ -14,6 +14,8 @@ pub struct Parser<'a> {
 
     current_token: Token,
     next_token: Token,
+
+    error_count: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -28,6 +30,8 @@ impl<'a> Parser<'a> {
 
             current_token: cur_token,
             next_token: next_token,
+
+            error_count: 0,
         }
     }
 
@@ -35,6 +39,17 @@ impl<'a> Parser<'a> {
         let errors = self.errors.clone();
         ::std::mem::drop(self);
         Rc::try_unwrap(errors).expect("errors ref count should be 1 here").into_inner()
+    }
+
+    fn error(&mut self, pos: Pos, msg: String) {
+        let position = self.scanner.file().position(pos);
+        self.errors.borrow_mut().add(position, msg);
+        self.error_count += 1;
+    }
+
+    fn current_error(&mut self, msg: String) {
+        let pos = self.current_token.pos();
+        self.error(pos, msg)
     }
 
     pub fn succ_token(&mut self) {
@@ -79,6 +94,8 @@ impl<'a> Parser<'a> {
         match self.current_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
+                let msg = format!("unexcepted token: {:?}", self.current_token.kind());
+                self.current_error(msg);
                 self.succ_token();
                 Decl::Error
             }
