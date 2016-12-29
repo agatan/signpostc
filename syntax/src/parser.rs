@@ -72,7 +72,7 @@ impl<'a> Parser<'a> {
             true
         } else {
             if report_error {
-                let msg = format!("expected '{}', got '{}'", kind, self.next_token.kind());
+                let msg = format!("expected {}, got {}", kind, self.next_token.kind());
                 let pos = self.next_token.pos();
                 self.error(pos, msg);
             }
@@ -103,7 +103,7 @@ impl<'a> Parser<'a> {
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
-                let msg = format!("unexcepted token: '{}'", self.current_token.kind());
+                let msg = format!("unexcepted token: {}", self.current_token.kind());
                 self.current_error(msg);
                 Decl::Error
             }
