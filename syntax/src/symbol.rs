@@ -33,6 +33,11 @@ impl Interner {
     pub fn get(&self, sym: &Symbol) -> Rc<String> {
         self.symbols[sym.0].clone()
     }
+
+    pub fn refresh(&mut self) {
+        self.symbols = Vec::new();
+        self.table = HashMap::new();
+    }
 }
 
 pub fn with_interner<T, F: FnOnce(&mut Interner) -> T>(f: F) -> T {
