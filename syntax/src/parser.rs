@@ -52,6 +52,11 @@ impl<'a> Parser<'a> {
         self.error(pos, msg)
     }
 
+    fn next_error(&mut self, msg: String) {
+        let pos = self.next_token.pos();
+        self.error(pos, msg)
+    }
+
     pub fn succ_token(&mut self) {
         self.current_token = self.next_token;
         self.next_token = self.scanner.scan();
@@ -73,11 +78,16 @@ impl<'a> Parser<'a> {
         self.next_token.kind() == kind
     }
 
-    fn expect_next(&mut self, kind: TokenKind) -> bool {
+    fn expect_next(&mut self, kind: TokenKind, report_error: bool) -> bool {
         if self.next_is(kind) {
             self.succ_token();
             true
         } else {
+            if report_error {
+                let msg = format!("expected {:?}, got {:?}", kind, self.next_token.kind());
+                let pos = self.next_token.pos();
+                self.error(pos, msg);
+            }
             false
         }
     }
@@ -86,6 +96,7 @@ impl<'a> Parser<'a> {
         let mut decls = Vec::new();
         while self.current_token.kind() != TokenKind::EOF {
             decls.push(self.parse_decl());
+            self.succ_token();
         }
         Program { decls: decls }
     }
@@ -94,7 +105,7 @@ impl<'a> Parser<'a> {
     fn sync_decl(&mut self) {
         loop {
             let kind = self.current_token.kind();
-            if kind == TokenKind::Def || kind == TokenKind::Let {
+            if kind == TokenKind::Def || kind == TokenKind::Let || kind == TokenKind::EOF {
                 break;
             }
             self.succ_token();
@@ -118,7 +129,65 @@ impl<'a> Parser<'a> {
 
     fn parse_def(&mut self) -> Decl {
         let pos = self.current_token.pos();
+        if !self.expect_next(TokenKind::Ident, true) {
+            return Decl::Error;
+        }
+        let name = self.current_token.symbol();
+        // TODO(agatan): generics parameters
+        if !self.expect_next(TokenKind::Lparen, true) {
+            return Decl::Error;
+        }
+        // TODO(gataan): parameters
+        while !self.next_is(TokenKind::Rparen) {
+            self.succ_token();
+            if self.next_is(TokenKind::EOF) {
+                self.next_error("unexpected EOF".to_string());
+                return Decl::Error;
+            }
+        }
         self.succ_token();
-        Decl::Def(pos)
+        // TODO(agatan): return type spec
+        if !self.expect_next(TokenKind::Lbrace, true) {
+            return Decl::Error;
+        }
+        // TODO(gataan): body
+        while !self.next_is(TokenKind::Rbrace) {
+            self.succ_token();
+            if self.next_is(TokenKind::EOF) {
+                self.next_error("unexpected EOF".to_string());
+                return Decl::Error;
+            }
+        }
+        self.succ_token();
+
+        Decl::Def(pos, name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use position::File;
+    use ast::*;
+
+    #[test]
+    fn test_parse_def() {
+        let input = r#"
+            def f() {
+            }
+        "#;
+        let file = File::new(None, input.len());
+        let mut parser = Parser::new(file, input);
+        let program = parser.parse_program();
+        assert_eq!(program.decls.len(), 1, "decls size is not 1: {:?}", program.decls);
+        let ref decl = program.decls[0];
+        match *decl {
+            Decl::Def(..) => (),
+            _ => {
+                panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
+                               decl,
+                               parser.into_errors()))
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 use position::Pos;
+use symbol::Symbol;
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -8,5 +9,5 @@ pub struct Program {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     Error,
-    Def(Pos),
+    Def(Pos, Symbol),
 }
