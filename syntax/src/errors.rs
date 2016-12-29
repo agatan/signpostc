@@ -38,6 +38,10 @@ impl ErrorList {
     pub fn add(&mut self, position: Position, msg: String) {
         self.errors.push(Error { position: position, message: msg })
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
 }
 
 impl fmt::Display for ErrorList {
