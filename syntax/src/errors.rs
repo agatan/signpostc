@@ -5,18 +5,18 @@ use std::fmt;
 use position::Position;
 
 #[derive(Debug, Clone)]
-pub struct Error<'a> {
-    pub position: Position<'a>,
+pub struct Error {
+    pub position: Position,
     pub message: String,
 }
 
-impl<'a> fmt::Display for Error<'a> {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}: {}", self.position, self.message)
     }
 }
 
-impl<'a> StdError for Error<'a> {
+impl StdError for Error {
     fn description(&self) -> &str {
         "syntax error"
     }
@@ -27,23 +27,23 @@ impl<'a> StdError for Error<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ErrorList<'a> {
-    errors: RefCell<Vec<Error<'a>>>,
+pub struct ErrorList {
+    errors: RefCell<Vec<Error>>,
 }
 
-impl<'a> ErrorList<'a> {
+impl ErrorList {
     pub fn new() -> Self {
         ErrorList {
             errors: RefCell::default(),
         }
     }
 
-    pub fn add(&self, position: Position<'a>, msg: String) {
+    pub fn add(&self, position: Position, msg: String) {
         self.errors.borrow_mut().push(Error { position: position, message: msg })
     }
 }
 
-impl<'a> fmt::Display for ErrorList<'a> {
+impl fmt::Display for ErrorList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let errs = self.errors.borrow();
         match errs.split_first() {
@@ -55,7 +55,7 @@ impl<'a> fmt::Display for ErrorList<'a> {
     }
 }
 
-impl<'a> StdError for ErrorList<'a> {
+impl StdError for ErrorList {
     fn description(&self) -> &str {
         "syntax error"
     }

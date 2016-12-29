@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::fmt;
 
 /// `SourcePos` represents a source position that contains byte offset, line number and column
@@ -12,13 +13,13 @@ pub struct SourcePos {
 
 /// `Position` represents a source position including file name, line number, column number and
 /// byte offset.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub enum Position<'a> {
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum Position {
     Dummy,
-    File(Option<&'a str>, SourcePos),
+    File(Option<Rc<String>>, SourcePos),
 }
 
-impl<'a> Position<'a> {
+impl Position {
     pub fn dummy() -> Self {
         Position::Dummy
     }
@@ -38,14 +39,14 @@ impl<'a> Position<'a> {
     }
 }
 
-impl<'a> fmt::Display for Position<'a> {
+impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Position::Dummy => "-".fmt(f),
-            Position::File(filename, SourcePos { line, column, .. }) => {
-                match filename {
+            Position::File(ref filename, SourcePos { line, column, .. }) => {
+                match *filename {
                     None => write!(f, "{}:{}", line, column),
-                    Some(name) => write!(f, "{}:{}:{}", name, line, column),
+                    Some(ref name) => write!(f, "{}:{}:{}", name, line, column),
                 }
             }
         }
@@ -70,23 +71,23 @@ impl Pos {
 
 /// `File` represents a source file.
 #[derive(Debug, Clone)]
-pub struct File<'a> {
-    name: Option<&'a str>,
+pub struct File {
+    name: Option<Rc<String>>,
     size: usize, // byte size of the file.
     lines: Vec<usize>, // byte offsets of heads of the file.
 }
 
-impl<'a> File<'a> {
-    pub fn new(filename: Option<&'a str>, size: usize) -> Self {
+impl File {
+    pub fn new(filename: Option<&str>, size: usize) -> Self {
         File {
-            name: filename,
+            name: filename.map(|s| Rc::new(s.to_string())),
             size: size,
             lines: vec![0],
         }
     }
 
-    pub fn name(&self) -> Option<&'a str> {
-        self.name
+    pub fn name(&self) -> Option<Rc<String>> {
+        self.name.clone()
     }
 
     pub fn size(&self) -> usize {
@@ -125,14 +126,14 @@ impl<'a> File<'a> {
     }
 
     /// returns the corresponding position of `pos`.
-    pub fn position(&self, pos: Pos) -> Position<'a> {
+    pub fn position(&self, pos: Pos) -> Position {
         match pos.0 {
             None => Position::Dummy,
             Some(bs) => {
                 let i = self.search_line(bs);
                 let line = i + 1;
                 let column = bs - self.lines[i] + 1;
-                Position::File(self.name,
+                Position::File(self.name(),
                                SourcePos {
                                    line: line,
                                    column: column,

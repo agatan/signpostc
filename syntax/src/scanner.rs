@@ -5,9 +5,9 @@ use position::File;
 
 #[derive(Debug, Clone)]
 pub struct Scanner<'a> {
-    file: File<'a>,
+    file: File,
     src: &'a str,
-    errors: &'a ErrorList<'a>,
+    errors: &'a ErrorList,
 
     // scanning states
     ch: char,
@@ -18,7 +18,7 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(file: File<'a>, src: &'a str, errors: &'a ErrorList<'a>) -> Self {
+    pub fn new(file: File, src: &'a str, errors: &'a ErrorList) -> Self {
         let mut sc = Scanner {
             file: file,
             src: src,
