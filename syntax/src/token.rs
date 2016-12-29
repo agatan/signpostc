@@ -10,6 +10,14 @@ pub struct Token {
 }
 
 impl Token {
+    pub fn dummy() -> Self {
+        Token {
+            pos: Pos::dummy(),
+            kind: TokenKind::Error,
+            symbol: Symbol::intern(""),
+        }
+    }
+
     pub fn new(pos: Pos, kind: TokenKind, symbol: &str) -> Self {
         Token {
             pos: pos,

@@ -22,7 +22,7 @@ impl<'a> Parser<'a> {
     pub fn new(file: File, src: &'a str) -> Self {
         let errors = Rc::new(RefCell::new(ErrorList::new()));
         let mut sc = Scanner::new(file, src, errors.clone());
-        let cur_token = sc.scan();
+        let cur_token = Token::dummy();
         let next_token = sc.scan();
         Parser {
             scanner: sc,
@@ -94,9 +94,8 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> Program {
         let mut decls = Vec::new();
-        while self.current_token.kind() != TokenKind::EOF {
+        while self.next_token.kind() != TokenKind::EOF {
             decls.push(self.parse_decl());
-            self.succ_token();
         }
         Program { decls: decls }
     }
@@ -104,7 +103,7 @@ impl<'a> Parser<'a> {
     /// succeed tokens and sync next declaration (for error reporting).
     fn sync_decl(&mut self) {
         loop {
-            let kind = self.current_token.kind();
+            let kind = self.next_token.kind();
             if kind == TokenKind::Def || kind == TokenKind::Let || kind == TokenKind::EOF {
                 break;
             }
@@ -113,7 +112,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_decl(&mut self) -> Decl {
-        let result = match self.current_token.kind() {
+        let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
                 let msg = format!("unexcepted token: {:?}", self.current_token.kind());
@@ -128,6 +127,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_def(&mut self) -> Decl {
+        if !self.expect_next(TokenKind::Def, true) {
+            return Decl::Error;
+        }
         let pos = self.current_token.pos();
         if !self.expect_next(TokenKind::Ident, true) {
             return Decl::Error;
