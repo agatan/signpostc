@@ -234,7 +234,7 @@ mod tests {
         for (expected_kind, expected_lit) in tests {
             let tok = sc.scan();
             assert_eq!(expected_kind, tok.kind());
-            assert_eq!(expected_lit, tok.literal());
+            assert_eq!(expected_lit, tok.symbol().as_str());
         }
     }
 
@@ -247,7 +247,7 @@ mod tests {
         {
             let tok = sc.scan();
             assert_eq!(TokenKind::Ident, tok.kind());
-            assert_eq!("a", tok.literal());
+            assert_eq!("a", tok.symbol().as_str());
         }
         {
             let tok = sc.scan();

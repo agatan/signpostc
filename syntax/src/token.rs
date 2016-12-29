@@ -1,19 +1,20 @@
 use position::Pos;
+use symbol::Symbol;
 
 /// represents tokens of source code.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Token<'a> {
+pub struct Token {
     pos: Pos,
     kind: TokenKind,
-    literal: &'a str,
+    symbol: Symbol,
 }
 
-impl<'a> Token<'a> {
-    pub fn new(pos: Pos, kind: TokenKind, literal: &'a str) -> Self {
+impl Token {
+    pub fn new(pos: Pos, kind: TokenKind, symbol: &str) -> Self {
         Token {
             pos: pos,
             kind: kind,
-            literal: literal,
+            symbol: Symbol::intern(symbol),
         }
     }
 
@@ -29,8 +30,8 @@ impl<'a> Token<'a> {
         self.kind == kind
     }
 
-    pub fn literal(&self) -> &str {
-        self.literal
+    pub fn symbol(&self) -> Symbol {
+        self.symbol
     }
 }
 

@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::Deref;
 
 /// holds strings and convert them into their own unique numbers.
 /// This can reduce name competition costs and memory usage.
@@ -51,8 +52,8 @@ impl Symbol {
         with_interner(|i| i.intern(s))
     }
 
-    pub fn as_str(&self) -> Rc<String> {
-        with_interner(|i| i.get(self))
+    pub fn as_str(&self) -> InternedString {
+        with_interner(|i| InternedString::new(i.get(self)))
     }
 
     pub fn as_usize(&self) -> usize {
@@ -66,6 +67,62 @@ impl fmt::Debug for Symbol {
     }
 }
 
+/// `InternedString` represents already interned symbol.
+/// `Interner` can convert `Symbol` to `InternedString`.
+/// `InternedString` implements `Deref` for `str`
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct InternedString {
+    inner: Rc<String>,
+}
+
+impl InternedString {
+    pub fn new(s: Rc<String>) -> Self {
+        InternedString {
+            inner: s,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &*self.inner
+    }
+}
+
+impl Deref for InternedString {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &*self.inner
+    }
+}
+
+impl<'a> PartialEq<&'a str> for InternedString {
+    #[inline(always)]
+    fn eq(&self, other: & &'a str) -> bool {
+        PartialEq::eq(&self.inner[..], *other)
+    }
+    #[inline(always)]
+    fn ne(&self, other: & &'a str) -> bool {
+        PartialEq::ne(&self.inner[..], *other)
+    }
+}
+
+impl<'a> PartialEq<InternedString > for &'a str {
+    #[inline(always)]
+    fn eq(&self, other: &InternedString) -> bool {
+        PartialEq::eq(*self, &other.inner[..])
+    }
+    #[inline(always)]
+    fn ne(&self, other: &InternedString) -> bool {
+        PartialEq::ne(*self, &other.inner[..])
+    }
+}
+
+impl fmt::Display for InternedString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,12 +131,12 @@ mod tests {
     fn test_interner() {
         let dog = Symbol::intern("dog");
         assert_eq!(0, dog.as_usize());
-        assert_eq!("dog", *dog.as_str());
+        assert_eq!("dog", dog.as_str());
         let cat = Symbol::intern("cat");
         assert_eq!(1, cat.as_usize());
-        assert_eq!("cat", *cat.as_str());
+        assert_eq!("cat", cat.as_str());
         let dog2 = Symbol::intern("dog");
         assert_eq!(0, dog2.as_usize());
-        assert_eq!("dog", *dog2.as_str());
+        assert_eq!("dog", dog2.as_str());
     }
 }
