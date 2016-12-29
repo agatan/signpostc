@@ -5,7 +5,7 @@ pub struct Program {
     pub decls: Vec<Decl>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     Error,
     Def(Pos),

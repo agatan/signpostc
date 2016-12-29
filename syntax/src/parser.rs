@@ -90,16 +90,30 @@ impl<'a> Parser<'a> {
         Program { decls: decls }
     }
 
+    /// succeed tokens and sync next declaration (for error reporting).
+    fn sync_decl(&mut self) {
+        loop {
+            let kind = self.current_token.kind();
+            if kind == TokenKind::Def || kind == TokenKind::Let {
+                break;
+            }
+            self.succ_token();
+        }
+    }
+
     pub fn parse_decl(&mut self) -> Decl {
-        match self.current_token.kind() {
+        let result = match self.current_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
                 let msg = format!("unexcepted token: {:?}", self.current_token.kind());
                 self.current_error(msg);
-                self.succ_token();
                 Decl::Error
             }
+        };
+        if Decl::Error == result {
+            self.sync_decl();
         }
+        result
     }
 
     fn parse_def(&mut self) -> Decl {
