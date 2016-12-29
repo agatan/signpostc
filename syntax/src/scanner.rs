@@ -60,7 +60,6 @@ impl<'a> Scanner<'a> {
 
     fn take_while<F: Fn(char) -> bool>(&mut self, f: F) {
         while f(self.ch) {
-            println!("take_while: {}", self.ch);
             self.next();
         }
     }
