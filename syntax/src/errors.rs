@@ -1,5 +1,4 @@
 //! This module implements `ErrorList` that holds errors in the syntax checking phase.
-use std::cell::RefCell;
 use std::error::Error as StdError;
 use std::fmt;
 use position::Position;
@@ -26,27 +25,24 @@ impl StdError for Error {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ErrorList {
-    errors: RefCell<Vec<Error>>,
+    errors: Vec<Error>,
 }
 
 impl ErrorList {
     pub fn new() -> Self {
-        ErrorList {
-            errors: RefCell::default(),
-        }
+        ErrorList::default()
     }
 
-    pub fn add(&self, position: Position, msg: String) {
-        self.errors.borrow_mut().push(Error { position: position, message: msg })
+    pub fn add(&mut self, position: Position, msg: String) {
+        self.errors.push(Error { position: position, message: msg })
     }
 }
 
 impl fmt::Display for ErrorList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let errs = self.errors.borrow();
-        match errs.split_first() {
+        match self.errors.split_first() {
             None => "no errors".fmt(f),
             Some((first, rest)) => {
                 write!(f, "{} (and {} more errors)", first, rest.len())

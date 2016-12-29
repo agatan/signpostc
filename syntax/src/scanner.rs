@@ -1,4 +1,7 @@
 //! `scanner` module implements the lexer phase of the language.
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use token::{Token, TokenKind};
 use errors::ErrorList;
 use position::File;
@@ -7,7 +10,7 @@ use position::File;
 pub struct Scanner<'a> {
     file: File,
     src: &'a str,
-    errors: &'a ErrorList,
+    errors: Rc<RefCell<ErrorList>>,
 
     // scanning states
     ch: char,
@@ -18,7 +21,7 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(file: File, src: &'a str, errors: &'a ErrorList) -> Self {
+    pub fn new(file: File, src: &'a str, errors: Rc<RefCell<ErrorList>>) -> Self {
         let mut sc = Scanner {
             file: file,
             src: src,
@@ -35,7 +38,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn error(&mut self, offset: usize, msg: String) {
-        self.errors.add(self.file.position(self.file.pos(offset)), msg);
+        self.errors.borrow_mut().add(self.file.position(self.file.pos(offset)), msg);
         self.error_count += 1;
     }
 
@@ -99,7 +102,10 @@ impl<'a> Scanner<'a> {
                 '}' => Token::new(pos, TokenKind::Rbrace, self.substr_from(offset)),
                 '[' => Token::new(pos, TokenKind::Lbrack, self.substr_from(offset)),
                 ']' => Token::new(pos, TokenKind::Rbrack, self.substr_from(offset)),
-                _ => Token::new(pos, TokenKind::Error, self.substr_from(offset)),
+                _ => {
+                    self.error(offset, format!("unknown character: {}", ch));
+                    Token::new(pos, TokenKind::Error, self.substr_from(offset))
+                }
             }
         }
     }
@@ -137,7 +143,7 @@ impl<'a> Scanner<'a> {
     }
 }
 
-fn is_prefix_operator(c: char) -> bool {
+pub fn is_prefix_operator(c: char) -> bool {
     "!-@".chars().any(|x| x == c)
 }
 
@@ -147,8 +153,9 @@ fn is_operator(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
-    use errors::*;
     use position::*;
     use token::TokenKind;
 
@@ -228,8 +235,8 @@ mod tests {
 
                          (TokenKind::EOF, "")];
         let file = File::new(Some("test"), input.len());
-        let errors = ErrorList::new();
-        let mut sc = Scanner::new(file, input, &errors);
+        let errors = Rc::default();
+        let mut sc = Scanner::new(file, input, errors);
 
         for (expected_kind, expected_lit) in tests {
             let tok = sc.scan();
@@ -242,8 +249,8 @@ mod tests {
     fn test_short_input() {
         let input = "a";
         let file = File::new(Some("test"), input.len());
-        let errors = ErrorList::new();
-        let mut sc = Scanner::new(file, input, &errors);
+        let errors = Rc::default();
+        let mut sc = Scanner::new(file, input, errors);
         let tok = sc.scan();
         assert_eq!(TokenKind::Ident, tok.kind());
         assert_eq!("a", tok.symbol().as_str());
