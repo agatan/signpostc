@@ -244,14 +244,10 @@ mod tests {
         let file = File::new(Some("test"), input.len());
         let errors = ErrorList::new();
         let mut sc = Scanner::new(file, input, &errors);
-        {
-            let tok = sc.scan();
-            assert_eq!(TokenKind::Ident, tok.kind());
-            assert_eq!("a", tok.symbol().as_str());
-        }
-        {
-            let tok = sc.scan();
-            assert_eq!(TokenKind::EOF, tok.kind());
-        }
+        let tok = sc.scan();
+        assert_eq!(TokenKind::Ident, tok.kind());
+        assert_eq!("a", tok.symbol().as_str());
+        let tok = sc.scan();
+        assert_eq!(TokenKind::EOF, tok.kind());
     }
 }
