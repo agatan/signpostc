@@ -59,7 +59,8 @@ impl<'a> Scanner<'a> {
     }
 
     fn take_while<F: Fn(char) -> bool>(&mut self, f: F) {
-        while !self.is_eof() && f(self.ch) {
+        while f(self.ch) {
+            println!("take_while: {}", self.ch);
             self.next();
         }
     }
@@ -78,7 +79,7 @@ impl<'a> Scanner<'a> {
         let offset = self.offset;
         let pos = self.file.pos(self.offset);
 
-        if self.is_eof() {
+        if self.ch == 0 as char {
             Token::new(pos, TokenKind::EOF, "")
         } else if is_operator(self.ch) {
             self.scan_operator()
@@ -171,64 +172,62 @@ mod tests {
                 false => 2,
             }
         "#;
-        let tests = vec![
-            // token type, literal
-            (TokenKind::Let, "let"),
-            (TokenKind::Ident, "ten"),
-            (TokenKind::Colon, ":"),
-            (TokenKind::Uident, "Int"),
-            (TokenKind::Eq, "="),
-            (TokenKind::Int, "10"),
-            (TokenKind::Semicolon, ";"),
+        let tests = vec![// token type, literal
+                         (TokenKind::Let, "let"),
+                         (TokenKind::Ident, "ten"),
+                         (TokenKind::Colon, ":"),
+                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Eq, "="),
+                         (TokenKind::Int, "10"),
+                         (TokenKind::Semicolon, ";"),
 
-            (TokenKind::Let, "let"),
-            (TokenKind::Ident, "five"),
-            (TokenKind::Colon, ":"),
-            (TokenKind::Uident, "Int"),
-            (TokenKind::Eq, "="),
-            (TokenKind::Int, "5"),
-            (TokenKind::Semicolon, ";"),
+                         (TokenKind::Let, "let"),
+                         (TokenKind::Ident, "five"),
+                         (TokenKind::Colon, ":"),
+                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Eq, "="),
+                         (TokenKind::Int, "5"),
+                         (TokenKind::Semicolon, ";"),
 
-            (TokenKind::Def, "def"),
-            (TokenKind::Ident, "identity"),
-            (TokenKind::Lparen, "("),
-            (TokenKind::Ident, "x"),
-            (TokenKind::Colon, ":"),
-            (TokenKind::Uident, "Int"),
-            (TokenKind::Rparen, ")"),
-            (TokenKind::Arrow, "->"),
-            (TokenKind::Uident, "Int"),
-            (TokenKind::Lbrace, "{"),
-            (TokenKind::Return, "return"),
-            (TokenKind::Ident, "x"),
-            (TokenKind::Semicolon, ";"),
-            (TokenKind::Rbrace, "}"),
+                         (TokenKind::Def, "def"),
+                         (TokenKind::Ident, "identity"),
+                         (TokenKind::Lparen, "("),
+                         (TokenKind::Ident, "x"),
+                         (TokenKind::Colon, ":"),
+                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Rparen, ")"),
+                         (TokenKind::Arrow, "->"),
+                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Lbrace, "{"),
+                         (TokenKind::Return, "return"),
+                         (TokenKind::Ident, "x"),
+                         (TokenKind::Semicolon, ";"),
+                         (TokenKind::Rbrace, "}"),
 
-            (TokenKind::If, "if"),
-            (TokenKind::True, "true"),
-            (TokenKind::Lbrace, "{"),
-            (TokenKind::Int, "1"),
-            (TokenKind::Rbrace, "}"),
-            (TokenKind::Else, "else"),
-            (TokenKind::Lbrace, "{"),
-            (TokenKind::Int, "2"),
-            (TokenKind::Rbrace, "}"),
+                         (TokenKind::If, "if"),
+                         (TokenKind::True, "true"),
+                         (TokenKind::Lbrace, "{"),
+                         (TokenKind::Int, "1"),
+                         (TokenKind::Rbrace, "}"),
+                         (TokenKind::Else, "else"),
+                         (TokenKind::Lbrace, "{"),
+                         (TokenKind::Int, "2"),
+                         (TokenKind::Rbrace, "}"),
 
-            (TokenKind::Match, "match"),
-            (TokenKind::True, "true"),
-            (TokenKind::Lbrace, "{"),
-            (TokenKind::True, "true"),
-            (TokenKind::FatArrow, "=>"),
-            (TokenKind::Int, "1"),
-            (TokenKind::Comma, ","),
-            (TokenKind::False, "false"),
-            (TokenKind::FatArrow, "=>"),
-            (TokenKind::Int, "2"),
-            (TokenKind::Comma, ","),
-            (TokenKind::Rbrace, "}"),
+                         (TokenKind::Match, "match"),
+                         (TokenKind::True, "true"),
+                         (TokenKind::Lbrace, "{"),
+                         (TokenKind::True, "true"),
+                         (TokenKind::FatArrow, "=>"),
+                         (TokenKind::Int, "1"),
+                         (TokenKind::Comma, ","),
+                         (TokenKind::False, "false"),
+                         (TokenKind::FatArrow, "=>"),
+                         (TokenKind::Int, "2"),
+                         (TokenKind::Comma, ","),
+                         (TokenKind::Rbrace, "}"),
 
-            (TokenKind::EOF, ""),
-        ];
+                         (TokenKind::EOF, "")];
         let file = File::new(Some("test"), input.len());
         let errors = ErrorList::new();
         let mut sc = Scanner::new(file, input, &errors);
@@ -237,6 +236,23 @@ mod tests {
             let tok = sc.scan();
             assert_eq!(expected_kind, tok.kind());
             assert_eq!(expected_lit, tok.literal());
+        }
+    }
+
+    #[test]
+    fn test_short_input() {
+        let input = "a";
+        let file = File::new(Some("test"), input.len());
+        let errors = ErrorList::new();
+        let mut sc = Scanner::new(file, input, &errors);
+        {
+            let tok = sc.scan();
+            assert_eq!(TokenKind::Ident, tok.kind());
+            assert_eq!("a", tok.literal());
+        }
+        {
+            let tok = sc.scan();
+            assert_eq!(TokenKind::EOF, tok.kind());
         }
     }
 }
