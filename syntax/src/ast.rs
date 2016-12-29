@@ -1,3 +1,5 @@
+use position::Pos;
+
 #[derive(Debug, Clone)]
 pub struct Program {
     pub decls: Vec<Decl>,
@@ -5,5 +7,6 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub enum Decl {
-    Dummy
+    Error,
+    Def(Pos),
 }
