@@ -62,18 +62,6 @@ impl<'a> Parser<'a> {
         self.next_token = self.scanner.scan();
     }
 
-    fn current_kind(&self) -> TokenKind {
-        self.current_token.kind()
-    }
-
-    fn current_pos(&self) -> Pos {
-        self.current_token.pos()
-    }
-
-    fn current_is(&self, kind: TokenKind) -> bool {
-        self.current_token.kind() == kind
-    }
-
     fn next_is(&self, kind: TokenKind) -> bool {
         self.next_token.kind() == kind
     }
@@ -84,7 +72,7 @@ impl<'a> Parser<'a> {
             true
         } else {
             if report_error {
-                let msg = format!("expected {:?}, got {:?}", kind, self.next_token.kind());
+                let msg = format!("expected '{}', got '{}'", kind, self.next_token.kind());
                 let pos = self.next_token.pos();
                 self.error(pos, msg);
             }
@@ -94,7 +82,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> Program {
         let mut decls = Vec::new();
-        while self.next_token.kind() != TokenKind::EOF {
+        while !self.next_is(TokenKind::EOF) {
             decls.push(self.parse_decl());
         }
         Program { decls: decls }
@@ -103,8 +91,8 @@ impl<'a> Parser<'a> {
     /// succeed tokens and sync next declaration (for error reporting).
     fn sync_decl(&mut self) {
         loop {
-            let kind = self.next_token.kind();
-            if kind == TokenKind::Def || kind == TokenKind::Let || kind == TokenKind::EOF {
+            if self.next_is(TokenKind::Def) || self.next_is(TokenKind::Let) ||
+               self.next_is(TokenKind::EOF) {
                 break;
             }
             self.succ_token();
@@ -115,7 +103,7 @@ impl<'a> Parser<'a> {
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
-                let msg = format!("unexcepted token: {:?}", self.current_token.kind());
+                let msg = format!("unexcepted token: '{}'", self.current_token.kind());
                 self.current_error(msg);
                 Decl::Error
             }
@@ -181,7 +169,10 @@ mod tests {
         let file = File::new(None, input.len());
         let mut parser = Parser::new(file, input);
         let program = parser.parse_program();
-        assert_eq!(program.decls.len(), 1, "decls size is not 1: {:?}", program.decls);
+        assert_eq!(program.decls.len(),
+                   1,
+                   "decls size is not 1: {:?}",
+                   program.decls);
         let ref decl = program.decls[0];
         match *decl {
             Decl::Def(..) => (),

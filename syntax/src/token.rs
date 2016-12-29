@@ -1,3 +1,5 @@
+use std::fmt;
+
 use position::Pos;
 use symbol::Symbol;
 
@@ -93,6 +95,51 @@ pub enum TokenKind {
     In,
     Continue,
     Break,
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::TokenKind::*;
+        let s = match *self {
+            Error => "<ERROR>",
+            EOF => "EOF",
+            Int => "Int",
+            True => "true",
+            False => "false",
+            Uident => "upper identifier",
+            Ident => "identifier",
+            Operator => "operator",
+            Eq => "=",
+            Pipe => "|",
+            Pipepipe => "||",
+            Arrow => "->",
+            FatArrow => "=>",
+            Comma => ",",
+            Colon => ":",
+            Semicolon => ";",
+            Lparen => "(",
+            Rparen => ")",
+            Lbrace => "{",
+            Rbrace => "}",
+            Lbrack => "[",
+            Rbrack => "]",
+            Def => "def",
+            Let => "let",
+            Struct => "struct",
+            Enum => "enum",
+            Interface => "interface",
+            Implement => "implement",
+            If => "if",
+            Else => "else",
+            Match => "match",
+            Return => "return",
+            For => "for",
+            In => "in",
+            Continue => "continue",
+            Break => "break",
+        };
+        fmt::Display::fmt(s, f)
+    }
 }
 
 impl TokenKind {
