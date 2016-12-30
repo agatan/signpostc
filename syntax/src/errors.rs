@@ -39,6 +39,10 @@ impl ErrorList {
         self.errors.push(Error { position: position, message: msg })
     }
 
+    pub fn add_error(&mut self, err: Error) {
+        self.errors.push(err)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
