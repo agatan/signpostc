@@ -93,6 +93,8 @@ impl<'a> Scanner<'a> {
             self.scan_identifier()
         } else if self.ch.is_digit(10) {
             self.scan_number()
+        } else if self.ch == '"' {
+            self.scan_string()
         } else {
             let ch = self.ch;
             self.next();
@@ -145,6 +147,38 @@ impl<'a> Scanner<'a> {
         let src = self.substr_from(offset);
         Token::new(pos, TokenKind::Int, src)
     }
+
+    fn scan_string(&mut self) -> Token {
+        let offset = self.offset;
+        let pos = self.file.pos(offset);
+        self.next();
+        loop {
+            if self.ch == 0 as char {
+                self.error(offset, "unclosed string literal".to_string());
+                return Token::new(pos, TokenKind::Error, self.substr_from(offset));
+            }
+            match self.ch {
+                '"' => {
+                    self.next();
+                    break;
+                }
+                '\\' => {
+                    self.next();
+                    match self.ch {
+                        'n' | 't' | 'a' | 'b' | 'r' | '"' | '\\' => self.next(),
+                        _ => {
+                            let o = self.offset;
+                            let ch = self.ch;
+                            self.error(o, format!("unexpected character '{}' after '\\'", ch));
+                            return Token::new(pos, TokenKind::Error, self.substr_from(offset));
+                        }
+                    }
+                }
+                _ => self.next(),
+            }
+        }
+        Token::new(pos, TokenKind::String, self.substr_from(offset))
+    }
 }
 
 pub fn is_prefix_operator(c: char) -> bool {
@@ -178,8 +212,8 @@ mod tests {
                 2
             }
             match true {
-                true => 1,
-                false => 2,
+                true => "true",
+                false => "\n\a\b\\\"",
             }
         "#;
         let tests = vec![// token type, literal
@@ -232,11 +266,11 @@ mod tests {
                          (TokenKind::Lbrace, "{"),
                          (TokenKind::True, "true"),
                          (TokenKind::FatArrow, "=>"),
-                         (TokenKind::Int, "1"),
+                         (TokenKind::String, r#""true""#),
                          (TokenKind::Comma, ","),
                          (TokenKind::False, "false"),
                          (TokenKind::FatArrow, "=>"),
-                         (TokenKind::Int, "2"),
+                         (TokenKind::String, r#""\n\a\b\\\"""#),
                          (TokenKind::Comma, ","),
                          (TokenKind::Rbrace, "}"),
 

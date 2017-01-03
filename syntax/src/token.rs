@@ -55,6 +55,7 @@ pub enum TokenKind {
     Int,
     True,
     False,
+    String,
     Uident,
     Ident,
 
@@ -108,6 +109,7 @@ impl fmt::Display for TokenKind {
             Int => "Int",
             True => "true",
             False => "false",
+            String => "String",
             Uident => "upper identifier",
             Ident => "identifier",
             Operator => "operator",
