@@ -121,11 +121,7 @@ impl<'a> Parser<'a> {
         self.expect_next(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         // TODO(agatan): generics parameters
-        let type_params = if self.next_is(TokenKind::Lbrack) {
-            self.parse_type_params()?
-        } else {
-            Vec::new()
-        };
+        let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
         let params = self.parse_params()?;
         // TODO(agatan): return type spec
         self.expect_next(TokenKind::Lbrace)?;
@@ -193,17 +189,25 @@ impl<'a> Parser<'a> {
         Ok(self.current_token.symbol())
     }
 
+    fn parse_optional_type_params(&mut self) -> Result<Option<Vec<Symbol>>, Error> {
+        if self.next_is(TokenKind::Langle) {
+            self.parse_type_params().map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
     fn parse_type_params(&mut self) -> Result<Vec<Symbol>, Error> {
-        self.expect_next(TokenKind::Lbrack)?;
+        self.expect_next(TokenKind::Langle)?;
         let mut params = Vec::new();
         loop {
             let typ = self.parse_type_param()?;
             params.push(typ);
-            if self.expect_next(TokenKind::Rbrack).is_ok() {
+            if self.expect_next(TokenKind::Rangle).is_ok() {
                 break;
             }
             self.expect_next(TokenKind::Comma)?;
-            if self.expect_next(TokenKind::Rparen).is_ok() {
+            if self.expect_next(TokenKind::Rangle).is_ok() {
                 // optional trailing comma.
                 break;
             }
@@ -279,10 +283,8 @@ mod tests {
 
     #[test]
     fn test_parse_def_with_typeparams() {
-        let tests = vec![("", 0, vec![]),
-                         ("[T]", 1, vec!["T"]),
-                         ("[T, U]", 2, vec!["T", "U"])];
-        for (input, len, names) in tests {
+        let tests = vec![("", 0, vec![]), ("<T>", 1, vec!["T"]), ("<T, U>", 2, vec!["T", "U"])];
+        for (i, (input, len, names)) in tests.into_iter().enumerate() {
             let input = format!("def f{}() {{ }}", input);
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
@@ -295,7 +297,8 @@ mod tests {
             let fun_decl = match *decl {
                 Decl::Def(_, ref f) => f,
                 _ => {
-                    panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
+                    panic!(format!("test[#{}]: expected Decl::Def, got {:?}: error: {:?}",
+                                   i,
                                    decl,
                                    parser.into_errors()))
                 }

@@ -169,7 +169,7 @@ mod tests {
             let ten: Int = 10;
             let five: Int = 5;
 
-            def identity(x: Int) -> Int {
+            def identity<T>(x: T) -> T {
                 return x;
             }
             if true {
@@ -201,13 +201,16 @@ mod tests {
 
                          (TokenKind::Def, "def"),
                          (TokenKind::Ident, "identity"),
+                         (TokenKind::Langle, "<"),
+                         (TokenKind::Uident, "T"),
+                         (TokenKind::Rangle, ">"),
                          (TokenKind::Lparen, "("),
                          (TokenKind::Ident, "x"),
                          (TokenKind::Colon, ":"),
-                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Uident, "T"),
                          (TokenKind::Rparen, ")"),
                          (TokenKind::Arrow, "->"),
-                         (TokenKind::Uident, "Int"),
+                         (TokenKind::Uident, "T"),
                          (TokenKind::Lbrace, "{"),
                          (TokenKind::Return, "return"),
                          (TokenKind::Ident, "x"),
@@ -242,10 +245,18 @@ mod tests {
         let errors = Rc::default();
         let mut sc = Scanner::new(file, input, errors);
 
-        for (expected_kind, expected_lit) in tests {
+        for (i, (expected_kind, expected_lit)) in tests.into_iter().enumerate() {
             let tok = sc.scan();
-            assert_eq!(expected_kind, tok.kind());
-            assert_eq!(expected_lit, tok.symbol().as_str());
+            assert_eq!(expected_kind,
+                       tok.kind(),
+                       "test[#{}]: expected literal = {}",
+                       i,
+                       expected_lit);
+            assert_eq!(expected_lit,
+                       tok.symbol().as_str(),
+                       "test[#{}]: expected literal= {}",
+                       i,
+                       expected_lit);
         }
     }
 

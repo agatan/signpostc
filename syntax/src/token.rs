@@ -78,6 +78,8 @@ pub enum TokenKind {
     Rbrace,
     Lbrack,
     Rbrack,
+    Langle,
+    Rangle,
 
     // keywords
     Def,
@@ -123,6 +125,8 @@ impl fmt::Display for TokenKind {
             Rbrace => "'}'",
             Lbrack => "'['",
             Rbrack => "']'",
+            Langle => "'<'",
+            Rangle => "'>'",
             Def => "def",
             Let => "let",
             Struct => "struct",
@@ -172,6 +176,8 @@ impl TokenKind {
             "||" => TokenKind::Pipepipe,
             "->" => TokenKind::Arrow,
             "=>" => TokenKind::FatArrow,
+            "<" => TokenKind::Langle,
+            ">" => TokenKind::Rangle,
             _ => TokenKind::Operator,
         }
     }
