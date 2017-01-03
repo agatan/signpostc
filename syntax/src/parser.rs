@@ -55,26 +55,6 @@ impl<'a> Parser<'a> {
         self.error_count += 1;
     }
 
-    fn make_error(&self, pos: Pos, msg: String) -> Error {
-        let position = self.scanner.file().position(pos);
-        Error {
-            position: position,
-            message: msg,
-        }
-    }
-
-    fn current_error(&mut self, msg: String) {
-        let pos = self.current_token.pos();
-        let err = self.make_error(pos, msg);
-        self.annotate_error(err)
-    }
-
-    fn next_error(&mut self, msg: String) {
-        let pos = self.next_token.pos();
-        let err = self.make_error(pos, msg);
-        self.annotate_error(err)
-    }
-
     fn position(&self, pos: Pos) -> Position {
         self.scanner.file().position(pos)
     }
