@@ -5,7 +5,7 @@ use token::{Token, TokenKind};
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{Program, Decl};
+use ast::{Program, Decl, Param, FunDecl};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -127,7 +127,10 @@ impl<'a> Parser<'a> {
             _ => {
                 let position = self.position(self.next_token.pos());
                 let msg = format!("unexcepted token: {}", self.current_token.kind());
-                Err(Error { position: position, message: msg })
+                Err(Error {
+                    position: position,
+                    message: msg,
+                })
             }
         };
         match result {
@@ -146,20 +149,7 @@ impl<'a> Parser<'a> {
         self.expect_next(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         // TODO(agatan): generics parameters
-        self.expect_next(TokenKind::Lparen)?;
-        // TODO(gataan): parameters
-        while !self.next_is(TokenKind::Rparen) {
-            self.succ_token();
-            if self.next_is(TokenKind::EOF) {
-                let pos = self.next_token.pos();
-                let position = self.position(pos);
-                return Err(Error {
-                    position: position,
-                    message: "unexpected EOF".to_string(),
-                });
-            }
-        }
-        self.succ_token();
+        let params = self.parse_params()?;
         // TODO(agatan): return type spec
         self.expect_next(TokenKind::Lbrace)?;
         // TODO(gataan): body
@@ -176,7 +166,48 @@ impl<'a> Parser<'a> {
         }
         self.succ_token();
 
-        Ok(Decl::Def(pos, name))
+        Ok(Decl::Def(pos, FunDecl::new(name, params)))
+    }
+
+    fn parse_param(&mut self) -> Result<Param, Error> {
+        self.expect_next(TokenKind::Ident)?;
+        let name = self.current_token.symbol();
+        self.expect_next(TokenKind::Colon)?;
+        // TODO(agatan): type
+        while !self.next_is(TokenKind::Comma) && !self.next_is(TokenKind::Rparen) {
+            self.succ_token();
+            if self.next_is(TokenKind::EOF) {
+                let pos = self.next_token.pos();
+                let position = self.position(pos);
+                return Err(Error {
+                    position: position,
+                    message: "unexpected EOF".to_string(),
+                });
+            }
+        }
+        Ok(Param { name: name })
+    }
+
+    fn parse_params(&mut self) -> Result<Vec<Param>, Error> {
+        self.expect_next(TokenKind::Lparen)?;
+        if self.expect_next(TokenKind::Rparen).is_ok() {
+            // no arguments.
+            return Ok(Vec::new());
+        }
+        let mut params = Vec::new();
+        loop {
+            let param = self.parse_param()?;
+            params.push(param);
+            if self.expect_next(TokenKind::Rparen).is_ok() {
+                break;
+            }
+            self.expect_next(TokenKind::Comma)?;
+            if self.expect_next(TokenKind::Rparen).is_ok() {
+                // optional trailing comma.
+                break;
+            }
+        }
+        Ok(params)
     }
 }
 
@@ -189,7 +220,7 @@ mod tests {
     #[test]
     fn test_parse_def() {
         let input = r#"
-            def f() {
+            def f(x: Int) {
             }
         "#;
         let file = File::new(None, input.len());
@@ -200,12 +231,45 @@ mod tests {
                    "decls size is not 1: {:?}",
                    program.decls);
         let ref decl = program.decls[0];
-        match *decl {
-            Decl::Def(..) => (),
+        let fun_decl = match *decl {
+            Decl::Def(_, ref f) => f,
             _ => {
                 panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
                                decl,
                                parser.into_errors()))
+            }
+        };
+        assert_eq!(fun_decl.name.as_str(), "f");
+        assert_eq!(fun_decl.params.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_params() {
+        let tests = vec![("()", 0, vec![]),
+                         ("(x: Int)", 1, vec!["x"]),
+                         ("(x: Int, y: Bool)", 2, vec!["x", "y"])];
+        for (input, len, names) in tests {
+            let input = format!("def f{} {{ }}", input);
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, &input);
+            let program = parser.parse_program();
+            assert_eq!(program.decls.len(),
+                       1,
+                       "decls size is not 1: {:?}",
+                       program.decls);
+            let ref decl = program.decls[0];
+            let fun_decl = match *decl {
+                Decl::Def(_, ref f) => f,
+                _ => {
+                    panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
+                                   decl,
+                                   parser.into_errors()))
+                }
+            };
+            assert_eq!(fun_decl.name.as_str(), "f");
+            assert_eq!(fun_decl.params.len(), len);
+            for (p, expected) in fun_decl.params.iter().zip(names.into_iter()) {
+                assert_eq!(p.name.as_str(), expected);
             }
         }
     }
