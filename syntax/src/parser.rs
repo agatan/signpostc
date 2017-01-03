@@ -19,15 +19,6 @@ pub struct Parser<'a> {
     error_count: usize,
 }
 
-macro_rules! try_parse {
-    ( $parse:expr, $ret:expr ) => {
-        if let Err(e) = $parse {
-            self.annotate_error(e);
-            return $ret;
-        }
-    }
-}
-
 impl<'a> Parser<'a> {
     pub fn new(file: File, src: &'a str) -> Self {
         let errors = Rc::new(RefCell::new(ErrorList::new()));
