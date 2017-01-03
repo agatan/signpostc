@@ -1,3 +1,5 @@
+#![feature(box_syntax)]
+
 pub mod position;
 pub mod symbol;
 pub mod token;

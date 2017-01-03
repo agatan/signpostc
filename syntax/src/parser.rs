@@ -6,7 +6,7 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{Program, Decl, Param, FunDecl};
+use ast::{Program, Decl, Param, FunDecl, Type};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -146,19 +146,8 @@ impl<'a> Parser<'a> {
         self.expect_next(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         self.expect_next(TokenKind::Colon)?;
-        // TODO(agatan): type
-        while !self.next_is(TokenKind::Comma) && !self.next_is(TokenKind::Rparen) {
-            self.succ_token();
-            if self.next_is(TokenKind::EOF) {
-                let pos = self.next_token.pos();
-                let position = self.position(pos);
-                return Err(Error {
-                    position: position,
-                    message: "unexpected EOF".to_string(),
-                });
-            }
-        }
-        Ok(Param { name: name })
+        let ty = self.parse_type();
+        Ok(Param::new(name, ty))
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, Error> {
@@ -214,6 +203,39 @@ impl<'a> Parser<'a> {
         }
         Ok(params)
     }
+
+    pub fn parse_type(&mut self) -> Type {
+        let ty = self.parse_type_();
+        match ty {
+            Ok(t) => t,
+            Err(e) => {
+                self.annotate_error(e);
+                Type::Error
+            }
+        }
+    }
+
+    fn parse_type_(&mut self) -> Result<Type, Error> {
+        self.expect_next(TokenKind::Uident)?;
+        let base_sym = self.current_token.symbol();
+        let mut ty = Type::from_symbol(base_sym);
+        if self.expect_next(TokenKind::Langle).is_ok() {
+            let mut args = Vec::new();
+            loop {
+                let ty = self.parse_type_()?;
+                args.push(ty);
+                if self.expect_next(TokenKind::Rangle).is_ok() {
+                    break;
+                }
+                self.expect_next(TokenKind::Comma)?;
+                if self.expect_next(TokenKind::Rangle).is_ok() {
+                    break;
+                }
+            }
+            ty = Type::app(ty, args);
+        }
+        Ok(ty)
+    }
 }
 
 #[cfg(test)]
@@ -221,6 +243,7 @@ mod tests {
     use super::*;
     use position::File;
     use ast::*;
+    use symbol::Symbol;
 
     #[test]
     fn test_parse_def() {
@@ -307,6 +330,29 @@ mod tests {
             for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {
                 assert_eq!(p.as_str(), expected);
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_type() {
+        let tests = vec![("Int", Type::Builtin(BuiltinType::Int)),
+                         ("Unit", Type::Builtin(BuiltinType::Unit)),
+                         ("Bool", Type::Builtin(BuiltinType::Bool)),
+                         ("Ref", Type::Ref),
+                         ("T", Type::Ident(Symbol::intern("T"))),
+                         ("Ref<T>",
+                          Type::App(box Type::Ref, vec![Type::Ident(Symbol::intern("T"))]))];
+
+        for (i, (input, expected_ty)) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, &input);
+            let ty = parser.parse_type();
+            assert_eq!(ty,
+                       expected_ty,
+                       "test[#{}]: input = {}, err = {:?}",
+                       i,
+                       input,
+                       parser.into_errors());
         }
     }
 }
