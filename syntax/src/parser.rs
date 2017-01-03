@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
             TokenKind::Def => self.parse_def(),
             _ => {
                 let position = self.position(self.next_token.pos());
-                let msg = format!("unexcepted token: {}", self.current_token.kind());
+                let msg = format!("unexcepted token: {}", self.next_token.kind());
                 Err(Error {
                     position: position,
                     message: msg,
