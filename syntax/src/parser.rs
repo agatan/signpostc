@@ -221,6 +221,7 @@ mod tests {
         };
         assert_eq!(fun_decl.name.as_str(), "f");
         assert_eq!(fun_decl.params.len(), 1);
+        assert_eq!(fun_decl.type_params.len(), 0);
     }
 
     #[test]
@@ -248,6 +249,7 @@ mod tests {
             };
             assert_eq!(fun_decl.name.as_str(), "f");
             assert_eq!(fun_decl.params.len(), len);
+            assert_eq!(fun_decl.type_params.len(), 0);
             for (p, expected) in fun_decl.params.iter().zip(names.into_iter()) {
                 assert_eq!(p.name.as_str(), expected);
             }

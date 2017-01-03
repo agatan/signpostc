@@ -1,5 +1,3 @@
-use std::iter::IntoIterator;
-
 use position::Pos;
 use symbol::Symbol;
 
@@ -21,23 +19,31 @@ pub struct Param {
 
 impl Param {
     pub fn new(name: Symbol) -> Self {
-        Param {
-            name: name,
-        }
+        Param { name: name }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunDecl {
     pub name: Symbol,
+    pub type_params: Vec<Symbol>,
     pub params: Vec<Param>,
 }
 
 impl FunDecl {
-    pub fn new<I: IntoIterator<Item=Param>>(name: Symbol, params: I) -> Self {
+    pub fn new(name: Symbol, params: Vec<Param>) -> Self {
         FunDecl {
             name: name,
-            params: params.into_iter().collect(),
+            type_params: Vec::new(),
+            params: params,
+        }
+    }
+
+    pub fn generic(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>) -> Self {
+        FunDecl {
+            name: name,
+            type_params: type_params,
+            params: params,
         }
     }
 }
