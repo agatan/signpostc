@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use token::{Token, TokenKind};
+use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
@@ -129,6 +130,11 @@ impl<'a> Parser<'a> {
         self.expect_next(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         // TODO(agatan): generics parameters
+        let type_params = if self.next_is(TokenKind::Lbrack) {
+            self.parse_type_params()?
+        } else {
+            Vec::new()
+        };
         let params = self.parse_params()?;
         // TODO(agatan): return type spec
         self.expect_next(TokenKind::Lbrace)?;
@@ -146,7 +152,7 @@ impl<'a> Parser<'a> {
         }
         self.succ_token();
 
-        Ok(Decl::Def(pos, FunDecl::new(name, params)))
+        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params)))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {
@@ -179,6 +185,30 @@ impl<'a> Parser<'a> {
             let param = self.parse_param()?;
             params.push(param);
             if self.expect_next(TokenKind::Rparen).is_ok() {
+                break;
+            }
+            self.expect_next(TokenKind::Comma)?;
+            if self.expect_next(TokenKind::Rparen).is_ok() {
+                // optional trailing comma.
+                break;
+            }
+        }
+        Ok(params)
+    }
+
+    /// TODO(agatan): Define type AST node.
+    fn parse_type_param(&mut self) -> Result<Symbol, Error> {
+        self.expect_next(TokenKind::Uident)?;
+        Ok(self.current_token.symbol())
+    }
+
+    fn parse_type_params(&mut self) -> Result<Vec<Symbol>, Error> {
+        self.expect_next(TokenKind::Lbrack)?;
+        let mut params = Vec::new();
+        loop {
+            let typ = self.parse_type_param()?;
+            params.push(typ);
+            if self.expect_next(TokenKind::Rbrack).is_ok() {
                 break;
             }
             self.expect_next(TokenKind::Comma)?;
@@ -252,6 +282,36 @@ mod tests {
             assert_eq!(fun_decl.type_params.len(), 0);
             for (p, expected) in fun_decl.params.iter().zip(names.into_iter()) {
                 assert_eq!(p.name.as_str(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_def_with_typeparams() {
+        let tests = vec![("", 0, vec![]),
+                         ("[T]", 1, vec!["T"]),
+                         ("[T, U]", 2, vec!["T", "U"])];
+        for (input, len, names) in tests {
+            let input = format!("def f{}() {{ }}", input);
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, &input);
+            let program = parser.parse_program();
+            assert_eq!(program.decls.len(),
+                       1,
+                       "decls size is not 1: {:?}",
+                       program.decls);
+            let ref decl = program.decls[0];
+            let fun_decl = match *decl {
+                Decl::Def(_, ref f) => f,
+                _ => {
+                    panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
+                                   decl,
+                                   parser.into_errors()))
+                }
+            };
+            assert_eq!(fun_decl.type_params.len(), len);
+            for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {
+                assert_eq!(p.as_str(), expected);
             }
         }
     }

@@ -31,15 +31,7 @@ pub struct FunDecl {
 }
 
 impl FunDecl {
-    pub fn new(name: Symbol, params: Vec<Param>) -> Self {
-        FunDecl {
-            name: name,
-            type_params: Vec::new(),
-            params: params,
-        }
-    }
-
-    pub fn generic(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>) -> Self {
+    pub fn new(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>) -> Self {
         FunDecl {
             name: name,
             type_params: type_params,
