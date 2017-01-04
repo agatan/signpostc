@@ -457,6 +457,43 @@ mod tests {
     }
 
     #[test]
+    fn test_prefix_expr() {
+        let tests = vec![// builtin operators
+                         ("!false", "!", Literal::Bool(false)),
+                         ("-12", "-", Literal::Int(12)),
+                         ("@0", "@", Literal::Int(0)),
+                         // user defined operators
+                         ("@~0", "@~", Literal::Int(0)),
+                         ("!~0", "!~", Literal::Int(0))];
+        for (i, (input, expected_op, expected_lit)) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            if let Expr::Prefix(_, op, box Expr::Literal(_, lit)) = e {
+                assert_eq!(op.as_str(),
+                           expected_op,
+                           "test[#{}]: input = {:?}, got op = {:?}",
+                           i,
+                           input,
+                           op);
+                assert_eq!(lit,
+                           expected_lit,
+                           "test[#{}]: input = {:?}, got lit = {:?}",
+                           i,
+                           input,
+                           lit);
+            } else {
+                assert!(false,
+                        "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
+                        i,
+                        input,
+                        e,
+                        parser.into_errors())
+            }
+        }
+    }
+
+    #[test]
     fn test_parse_type() {
         let tests = vec![("Int", Type::Builtin(BuiltinType::Int)),
                          ("Unit", Type::Builtin(BuiltinType::Unit)),
