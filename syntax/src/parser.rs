@@ -205,7 +205,36 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Expr {
-        unimplemented!()
+        match self.parse_expr_(Prec::Lowest) {
+            Ok(e) => e,
+            Err(e) => {
+                self.annotate_error(e);
+                // TODO(agatan): sync with next exprssesion
+                Expr::Error
+            }
+        }
+    }
+
+    fn parse_expr_(&mut self, prec: Prec) -> Result<Expr, Error> {
+        match self.next_token.kind() {
+            TokenKind::Ident => self.parse_identifier(),
+            t => {
+                let pos = self.next_token.pos();
+                let position = self.position(pos);
+                let msg = format!("unexpected token: {}. expression expected.", t);
+                Err(Error {
+                    position: position,
+                    message: msg,
+                })
+            }
+        }
+    }
+
+    fn parse_identifier(&mut self) -> Result<Expr, Error> {
+        let pos = self.current_token.pos();
+        self.expect_next(TokenKind::Ident)?;
+        let sym = self.current_token.symbol();
+        Ok(Expr::Ident(pos, sym))
     }
 
     pub fn parse_type(&mut self) -> Type {
@@ -240,6 +269,18 @@ impl<'a> Parser<'a> {
         }
         Ok(ty)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Prec {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+    More(usize),
 }
 
 #[cfg(test)]
@@ -351,7 +392,37 @@ mod tests {
                 Expr::Literal(_, actual) => {
                     assert_eq!(actual, expected, "test[#{}]: input = {}", i, input)
                 }
-                _ => assert!(false, "test[#{}]: input = {}, got = {:?}", i, input, e),
+                _ => {
+                    assert!(false,
+                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            i,
+                            input,
+                            e,
+                            parser.into_errors())
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_identifier() {
+        let tests = vec!["a", "b", "abc"];
+        for (i, input) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            match e {
+                Expr::Ident(_, actual) => {
+                    assert_eq!(actual.as_str(), input, "test[#{}]: input = {}", i, input)
+                }
+                _ => {
+                    assert!(false,
+                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            i,
+                            input,
+                            e,
+                            parser.into_errors())
+                }
             }
         }
     }

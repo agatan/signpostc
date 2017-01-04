@@ -53,6 +53,7 @@ pub enum Literal {
 pub enum Expr {
     Error,
     Literal(Pos, Literal),
+    Ident(Pos, Symbol),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
