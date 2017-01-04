@@ -221,6 +221,7 @@ impl<'a> Parser<'a> {
             TokenKind::String => self.parse_string_literal(),
             TokenKind::True | TokenKind::False => self.parse_bool_literal(),
             TokenKind::Ident => self.parse_identifier(),
+            TokenKind::Operator if self.next_token.is_prefix_operator() => self.parse_prefix_expr(),
             t => {
                 let pos = self.next_token.pos();
                 let position = self.position(pos);
@@ -264,6 +265,14 @@ impl<'a> Parser<'a> {
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
         Ok(Expr::Ident(pos, sym))
+    }
+
+    fn parse_prefix_expr(&mut self) -> Result<Expr, Error> {
+        self.succ_token();
+        let pos = self.current_token.pos();
+        let op = self.current_token.symbol();
+        let expr = self.parse_expr_(Prec::Prefix)?;
+        Ok(Expr::Prefix(pos, op, box expr))
     }
 
     pub fn parse_type(&mut self) -> Type {

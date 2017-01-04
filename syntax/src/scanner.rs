@@ -181,10 +181,6 @@ impl<'a> Scanner<'a> {
     }
 }
 
-pub fn is_prefix_operator(c: char) -> bool {
-    "!-@".chars().any(|x| x == c)
-}
-
 fn is_operator(c: char) -> bool {
     "!@$%^&*-+=?<>/|~".chars().any(|x| x == c)
 }

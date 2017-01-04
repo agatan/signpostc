@@ -43,6 +43,17 @@ impl Token {
     pub fn symbol(&self) -> Symbol {
         self.symbol
     }
+
+    pub fn is_prefix_operator(&self) -> bool {
+        if self.kind != TokenKind::Operator {
+            return false;
+        }
+
+        fn is_prefix_operator_char(c: char) -> bool {
+            "!-@".chars().any(|x| x == c)
+        }
+        self.symbol.as_str().starts_with(is_prefix_operator_char)
+    }
 }
 
 /// Kind of tokens.
