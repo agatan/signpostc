@@ -56,6 +56,17 @@ impl Token {
     }
 }
 
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            TokenKind::Operator | TokenKind::Uident | TokenKind::Ident => {
+                fmt::Display::fmt(&*self.symbol.as_str(), f)
+            }
+            ref kind => fmt::Display::fmt(kind, f),
+        }
+    }
+}
+
 /// Kind of tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenKind {

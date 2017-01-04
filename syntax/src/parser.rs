@@ -65,7 +65,7 @@ impl<'a> Parser<'a> {
             self.succ_token();
             Ok(())
         } else {
-            let msg = format!("expected {}, got {}", kind, self.next_token.kind());
+            let msg = format!("expected {}, got {}", kind, self.next_token);
             let pos = self.next_token.pos();
             Err(Error {
                 position: self.position(pos),
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
             TokenKind::Def => self.parse_def(),
             _ => {
                 let position = self.position(self.next_token.pos());
-                let msg = format!("unexcepted token: {}", self.next_token.kind());
+                let msg = format!("unexcepted token: {}", self.next_token);
                 Err(Error {
                     position: position,
                     message: msg,
@@ -222,10 +222,11 @@ impl<'a> Parser<'a> {
             TokenKind::True | TokenKind::False => self.parse_bool_literal(),
             TokenKind::Ident => self.parse_identifier(),
             TokenKind::Operator if self.next_token.is_prefix_operator() => self.parse_prefix_expr(),
-            t => {
+            _ => {
                 let pos = self.next_token.pos();
                 let position = self.position(pos);
-                let msg = format!("unexpected token: {}. expression expected.", t);
+                let msg = format!("unexpected token: {}. expression expected.",
+                                  self.next_token);
                 Err(Error {
                     position: position,
                     message: msg,
