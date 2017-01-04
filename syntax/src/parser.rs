@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Expr {
-        match self.parse_expr_(Prec::Lowest) {
+        match self.parse_expr_(0) {
             Ok(e) => e,
             Err(e) => {
                 self.annotate_error(e);
@@ -272,7 +272,7 @@ impl<'a> Parser<'a> {
         self.succ_token();
         let pos = self.current_token.pos();
         let op = self.current_token.symbol();
-        let expr = self.parse_expr_(Prec::Prefix)?;
+        let expr = self.parse_expr_(7)?;
         Ok(Expr::Prefix(pos, op, box expr))
     }
 
@@ -310,17 +310,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Prec {
-    Lowest,
-    Equals,
-    LessGreater,
-    Sum,
-    Product,
-    Prefix,
-    Call,
-    More(usize),
-}
+type Prec = usize;
 
 #[cfg(test)]
 mod tests {
@@ -499,6 +489,56 @@ mod tests {
                         input,
                         e,
                         parser.into_errors())
+            }
+        }
+    }
+
+    #[test]
+    fn test_infix_expr() {
+        let tests = vec![("5 + 5", 5, "+", 5),
+                         ("5 - 5", 5, "-", 5),
+                         ("5 * 5", 5, "*", 5),
+                         ("5 / 5", 5, "/", 5),
+                         ("5 > 5", 5, ">", 5),
+                         ("5 == 5", 5, "==", 5),
+                         ("5 := 5", 5, ":=", 5),
+                         ("5 != 5", 5, "!=", 5),
+                         ("5 | 5", 5, "|", 5),
+                         ("5 || 5", 5, "||", 5)];
+        for (i, (input, expected_lhs, expected_op, expected_rhs)) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            match e {
+                Expr::Infix(_,
+                            box Expr::Literal(_, Literal::Int(lhs)),
+                            op,
+                            box Expr::Literal(_, Literal::Int(rhs))) => {
+                    assert_eq!(lhs,
+                               expected_lhs,
+                               "test[#{}]: lhs is not {}, got {}",
+                               i,
+                               expected_lhs,
+                               lhs);
+                    assert_eq!(rhs,
+                               expected_rhs,
+                               "test[#{}]: rhs is not {}, got {}",
+                               i,
+                               expected_rhs,
+                               rhs);
+                    assert_eq!(op.as_str(),
+                               expected_op,
+                               "test[#{}]: op is not {:?}, got {:?}",
+                               i,
+                               expected_op,
+                               op);
+                }
+                _ => {
+                    assert!(false,
+                            "test[#{}]: expression is not an infix expression. got = {:?}",
+                            i,
+                            e);
+                }
             }
         }
     }

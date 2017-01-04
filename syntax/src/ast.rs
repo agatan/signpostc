@@ -55,6 +55,7 @@ pub enum Expr {
     Literal(Pos, Literal),
     Ident(Pos, Symbol),
     Prefix(Pos, Symbol, Box<Expr>),
+    Infix(Pos, Box<Expr>, Symbol, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

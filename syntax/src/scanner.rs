@@ -87,7 +87,7 @@ impl<'a> Scanner<'a> {
 
         if self.ch == 0 as char {
             Token::new(pos, TokenKind::EOF, "")
-        } else if is_operator(self.ch) {
+        } else if is_operator_head(self.ch) {
             self.scan_operator()
         } else if self.ch.is_alphabetic() {
             self.scan_identifier()
@@ -181,8 +181,12 @@ impl<'a> Scanner<'a> {
     }
 }
 
+fn is_operator_head(c: char) -> bool {
+    "=<>@^|&+-*/$%!?~".chars().any(|x| x == c)
+}
+
 fn is_operator(c: char) -> bool {
-    "!@$%^&*-+=?<>/|~".chars().any(|x| x == c)
+    "!$%&*+-./:<=>?@^|~".chars().any(|x| x == c)
 }
 
 #[cfg(test)]
