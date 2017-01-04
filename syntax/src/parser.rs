@@ -6,7 +6,7 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{Program, Decl, Param, FunDecl, Type};
+use ast::{Program, Decl, Param, FunDecl, Type, Expr, Literal};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -204,6 +204,10 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
+    pub fn parse_expr(&mut self) -> Expr {
+        unimplemented!()
+    }
+
     pub fn parse_type(&mut self) -> Type {
         let ty = self.parse_type_();
         match ty {
@@ -329,6 +333,25 @@ mod tests {
             assert_eq!(fun_decl.type_params.len(), len);
             for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {
                 assert_eq!(p.as_str(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_literal() {
+        let tests = vec![("32", Literal::Int(32)),
+                         (r#""abc""#, Literal::String(Symbol::intern(r#""abc""#))),
+                         ("true", Literal::Bool(true)),
+                         ("false", Literal::Bool(false))];
+        for (i, (input, expected)) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            match e {
+                Expr::Literal(_, actual) => {
+                    assert_eq!(actual, expected, "test[#{}]: input = {}", i, input)
+                }
+                _ => assert!(false, "test[#{}]: input = {}, got = {:?}", i, input, e),
             }
         }
     }

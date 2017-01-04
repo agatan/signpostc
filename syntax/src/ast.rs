@@ -41,6 +41,20 @@ impl FunDecl {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Unit,
+    Int(i64),
+    Bool(bool),
+    String(Symbol),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
+    Error,
+    Literal(Pos, Literal),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinType {
     Unit,
