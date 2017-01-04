@@ -217,6 +217,9 @@ impl<'a> Parser<'a> {
 
     fn parse_expr_(&mut self, prec: Prec) -> Result<Expr, Error> {
         match self.next_token.kind() {
+            TokenKind::Int => self.parse_integer_literal(),
+            TokenKind::String => self.parse_string_literal(),
+            TokenKind::True | TokenKind::False => self.parse_bool_literal(),
             TokenKind::Ident => self.parse_identifier(),
             t => {
                 let pos = self.next_token.pos();
@@ -230,9 +233,35 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_identifier(&mut self) -> Result<Expr, Error> {
+    fn parse_integer_literal(&mut self) -> Result<Expr, Error> {
+        self.expect_next(TokenKind::Int)?;
         let pos = self.current_token.pos();
+        let sym = self.current_token.symbol();
+        let num = sym.as_str().parse::<i64>().expect("integer parse error");
+        Ok(Expr::Literal(pos, Literal::Int(num)))
+    }
+
+    fn parse_string_literal(&mut self) -> Result<Expr, Error> {
+        self.succ_token();
+        let pos = self.current_token.pos();
+        let sym = self.current_token.symbol();
+        Ok(Expr::Literal(pos, Literal::String(sym)))
+    }
+
+    fn parse_bool_literal(&mut self) -> Result<Expr, Error> {
+        self.succ_token();
+        let pos = self.current_token.pos();
+        let lit = if self.current_token.kind() == TokenKind::True {
+            Literal::Bool(true)
+        } else {
+            Literal::Bool(false)
+        };
+        Ok(Expr::Literal(pos, lit))
+    }
+
+    fn parse_identifier(&mut self) -> Result<Expr, Error> {
         self.expect_next(TokenKind::Ident)?;
+        let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
         Ok(Expr::Ident(pos, sym))
     }
@@ -390,11 +419,11 @@ mod tests {
             let e = parser.parse_expr();
             match e {
                 Expr::Literal(_, actual) => {
-                    assert_eq!(actual, expected, "test[#{}]: input = {}", i, input)
+                    assert_eq!(actual, expected, "test[#{}]: input = {:?}", i, input)
                 }
                 _ => {
                     assert!(false,
-                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
                             i,
                             input,
                             e,
@@ -413,11 +442,11 @@ mod tests {
             let e = parser.parse_expr();
             match e {
                 Expr::Ident(_, actual) => {
-                    assert_eq!(actual.as_str(), input, "test[#{}]: input = {}", i, input)
+                    assert_eq!(actual.as_str(), input, "test[#{}]: input = {:?}", i, input)
                 }
                 _ => {
                     assert!(false,
-                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
                             i,
                             input,
                             e,
