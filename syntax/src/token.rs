@@ -50,7 +50,7 @@ impl Token {
         }
 
         fn is_prefix_operator_char(c: char) -> bool {
-            "!-@".chars().any(|x| x == c)
+            c == '-' || c == '!' || c == '@'
         }
         self.symbol.as_str().starts_with(is_prefix_operator_char)
     }

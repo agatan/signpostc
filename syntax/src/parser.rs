@@ -314,6 +314,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_prefix_expr(&mut self) -> Result<Expr, Error> {
+        if !self.next_token.is_prefix_operator() {
+            return Err(self.make_error(self.next_token,
+                                       format!("unexpected token: {}. Prefix operator should \
+                                                starts with '-', '!' or '@'",
+                                               self.next_token)));
+        }
         self.succ_token();
         let pos = self.current_token.pos();
         let op = self.current_token.symbol();
