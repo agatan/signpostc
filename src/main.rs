@@ -9,6 +9,7 @@ use std::rc::Rc;
 use syntax::scanner::Scanner;
 use syntax::position;
 use syntax::token::TokenKind;
+use syntax::ast;
 
 const PROMPT: &'static str = ">> ";
 
@@ -30,6 +31,9 @@ fn repl() {
         }
         let parse_result = syntax::parse_file("stdin", &line);
         println!("{:?}", parse_result);
+        if let Ok(prog) = parse_result {
+            ast::dump_program(io::stdout(), &prog).unwrap();
+        }
         print!("{}", PROMPT);
         io::stdout().flush().unwrap();
     }
@@ -44,5 +48,8 @@ fn main() {
         fp.read_to_string(&mut input).expect("failed to read");
         let parse_result = syntax::parse_file(&env::args().nth(1).unwrap(), &input);
         println!("{:?}", parse_result);
+        if let Ok(prog) = parse_result {
+            ast::dump_program(io::stdout(), &prog).unwrap();
+        }
     }
 }

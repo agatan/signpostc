@@ -113,7 +113,8 @@ impl<'a> Parser<'a> {
 
     fn next_is_separator(&self) -> bool {
         let kind = self.next_token.kind();
-        kind == TokenKind::EOF || kind == TokenKind::Newline || kind == TokenKind::Semicolon
+        kind == TokenKind::EOF || kind == TokenKind::Newline || kind == TokenKind::Semicolon ||
+        kind == TokenKind::Rparen || kind == TokenKind::Rbrace
     }
 
     fn expect_without_newline(&mut self, kind: TokenKind) -> Result<(), Error> {
