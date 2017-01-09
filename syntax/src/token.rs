@@ -73,6 +73,7 @@ pub enum TokenKind {
     Error,
 
     EOF,
+    Newline,
 
     Int,
     True,
@@ -126,6 +127,7 @@ impl fmt::Display for TokenKind {
         let s = match *self {
             Error => "<ERROR>",
             EOF => "EOF",
+            Newline => "'\\n'",
             Int => "Int",
             True => "true",
             False => "false",

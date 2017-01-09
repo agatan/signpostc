@@ -72,7 +72,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        self.take_while(|c| c.is_whitespace());
+        self.take_while(|c| c == '\t' || c == ' ')
     }
 
     fn substr_from(&self, offset: usize) -> &str {
@@ -108,6 +108,7 @@ impl<'a> Scanner<'a> {
                 '}' => Token::new(pos, TokenKind::Rbrace, self.substr_from(offset)),
                 '[' => Token::new(pos, TokenKind::Lbrack, self.substr_from(offset)),
                 ']' => Token::new(pos, TokenKind::Rbrack, self.substr_from(offset)),
+                '\n' => Token::new(pos, TokenKind::Newline, self.substr_from(offset)),
                 _ => {
                     self.error(offset, format!("unknown character: {}", ch));
                     Token::new(pos, TokenKind::Error, self.substr_from(offset))
@@ -202,7 +203,6 @@ mod tests {
         let input = r#"
             let ten: Int = 10;
             let five: Int = 5;
-
             def identity<T>(x: T) -> T {
                 return x;
             }
@@ -217,6 +217,7 @@ mod tests {
             }
         "#;
         let tests = vec![// token type, literal
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Let, "let"),
                          (TokenKind::Ident, "ten"),
                          (TokenKind::Colon, ":"),
@@ -224,6 +225,7 @@ mod tests {
                          (TokenKind::Eq, "="),
                          (TokenKind::Int, "10"),
                          (TokenKind::Semicolon, ";"),
+                         (TokenKind::Newline, "\n"),
 
                          (TokenKind::Let, "let"),
                          (TokenKind::Ident, "five"),
@@ -232,6 +234,7 @@ mod tests {
                          (TokenKind::Eq, "="),
                          (TokenKind::Int, "5"),
                          (TokenKind::Semicolon, ";"),
+                         (TokenKind::Newline, "\n"),
 
                          (TokenKind::Def, "def"),
                          (TokenKind::Ident, "identity"),
@@ -246,33 +249,45 @@ mod tests {
                          (TokenKind::Arrow, "->"),
                          (TokenKind::Uident, "T"),
                          (TokenKind::Lbrace, "{"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Return, "return"),
                          (TokenKind::Ident, "x"),
                          (TokenKind::Semicolon, ";"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Rbrace, "}"),
+                         (TokenKind::Newline, "\n"),
 
                          (TokenKind::If, "if"),
                          (TokenKind::True, "true"),
                          (TokenKind::Lbrace, "{"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Int, "1"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Rbrace, "}"),
                          (TokenKind::Else, "else"),
                          (TokenKind::Lbrace, "{"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Int, "2"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Rbrace, "}"),
+                         (TokenKind::Newline, "\n"),
 
                          (TokenKind::Match, "match"),
                          (TokenKind::True, "true"),
                          (TokenKind::Lbrace, "{"),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::True, "true"),
                          (TokenKind::FatArrow, "=>"),
                          (TokenKind::String, r#""true""#),
                          (TokenKind::Comma, ","),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::False, "false"),
                          (TokenKind::FatArrow, "=>"),
                          (TokenKind::String, r#""\n\a\b\\\"""#),
                          (TokenKind::Comma, ","),
+                         (TokenKind::Newline, "\n"),
                          (TokenKind::Rbrace, "}"),
+                         (TokenKind::Newline, "\n"),
 
                          (TokenKind::EOF, "")];
         let file = File::new(Some("test"), input.len());
