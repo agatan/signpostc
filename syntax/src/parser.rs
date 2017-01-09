@@ -68,6 +68,15 @@ impl<'a> Parser<'a> {
         self.infix_func_map.get(&token.kind()).map(|&f| f)
     }
 
+    fn make_error(&self, token: Token, msg: String) -> Error {
+        let pos = token.pos();
+        let position = self.position(pos);
+        Error {
+            position: position,
+            message: msg,
+        }
+    }
+
     pub fn into_errors(self) -> ErrorList {
         let errors = self.errors.clone();
         ::std::mem::drop(self);
@@ -114,11 +123,7 @@ impl<'a> Parser<'a> {
             Ok(())
         } else {
             let msg = format!("expected {}, got {}", kind, self.next_token);
-            let pos = self.next_token.pos();
-            Err(Error {
-                position: self.position(pos),
-                message: msg,
-            })
+            Err(self.make_error(self.next_token, msg))
         }
     }
 
@@ -146,12 +151,8 @@ impl<'a> Parser<'a> {
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
-                let position = self.position(self.next_token.pos());
                 let msg = format!("unexcepted token: {}", self.next_token);
-                Err(Error {
-                    position: position,
-                    message: msg,
-                })
+                Err(self.make_error(self.next_token, msg))
             }
         };
         match result {
@@ -264,14 +265,9 @@ impl<'a> Parser<'a> {
         let prefix = match self.get_prefix_fn(&self.next_token) {
             Some(f) => f,
             None => {
-                let pos = self.next_token.pos();
-                let position = self.position(pos);
                 let msg = format!("unexpected token: {}. expression expected.",
                                   self.next_token);
-                return Err(Error {
-                    position: position,
-                    message: msg,
-                });
+                return Err(self.make_error(self.next_token, msg));
             }
         };
         let left = prefix(self)?;
