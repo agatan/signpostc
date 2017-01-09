@@ -124,12 +124,17 @@ impl<'a> Parser<'a> {
         let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
         let params = self.parse_params()?;
         // TODO(agatan): return type spec
+        let ret_ty = if self.expect_next(TokenKind::Colon).is_ok() {
+            Some(self.parse_type())
+        } else {
+            None
+        };
         self.expect_next(TokenKind::Lbrace)?;
         let body = self.parse_expr();
         self.expect_next(TokenKind::Rbrace)?;
         self.succ_token();
 
-        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, body)))
+        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, ret_ty, body)))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {

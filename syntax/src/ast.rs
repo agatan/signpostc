@@ -32,16 +32,23 @@ pub struct FunDecl {
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
     pub params: Vec<Param>,
+    pub ret: Type,
     // TODO(agatan): body should be `Vec<Stmt>`
     pub body: Expr,
 }
 
 impl FunDecl {
-    pub fn new(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>, body: Expr) -> Self {
+    pub fn new(name: Symbol,
+               type_params: Vec<Symbol>,
+               params: Vec<Param>,
+               ret: Option<Type>,
+               body: Expr)
+               -> Self {
         FunDecl {
             name: name,
             type_params: type_params,
             params: params,
+            ret: ret.unwrap_or(Type::Builtin(BuiltinType::Unit)),
             body: body,
         }
     }
