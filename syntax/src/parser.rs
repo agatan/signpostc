@@ -125,21 +125,11 @@ impl<'a> Parser<'a> {
         let params = self.parse_params()?;
         // TODO(agatan): return type spec
         self.expect_next(TokenKind::Lbrace)?;
-        // TODO(gataan): body
-        while !self.next_is(TokenKind::Rbrace) {
-            self.succ_token();
-            if self.next_is(TokenKind::EOF) {
-                let pos = self.next_token.pos();
-                let position = self.scanner.file().position(pos);
-                return Err(Error {
-                    position: position,
-                    message: "unexpected EOF".to_string(),
-                });
-            }
-        }
+        let body = self.parse_expr();
+        self.expect_next(TokenKind::Rbrace)?;
         self.succ_token();
 
-        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params)))
+        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, body)))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {

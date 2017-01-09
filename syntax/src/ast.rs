@@ -20,7 +20,10 @@ pub struct Param {
 
 impl Param {
     pub fn new(name: Symbol, ty: Type) -> Self {
-        Param { name: name, ty: ty }
+        Param {
+            name: name,
+            ty: ty,
+        }
     }
 }
 
@@ -29,14 +32,17 @@ pub struct FunDecl {
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
     pub params: Vec<Param>,
+    // TODO(agatan): body should be `Vec<Stmt>`
+    pub body: Expr,
 }
 
 impl FunDecl {
-    pub fn new(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>) -> Self {
+    pub fn new(name: Symbol, type_params: Vec<Symbol>, params: Vec<Param>, body: Expr) -> Self {
         FunDecl {
             name: name,
             type_params: type_params,
             params: params,
+            body: body,
         }
     }
 }
