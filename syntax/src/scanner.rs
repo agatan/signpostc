@@ -183,7 +183,7 @@ impl<'a> Scanner<'a> {
 }
 
 fn is_operator_head(c: char) -> bool {
-    "=<>@^|&+-*/$%!?~".chars().any(|x| x == c)
+    "=<>@^|&+-*/$%!?~:".chars().any(|x| x == c)
 }
 
 fn is_operator(c: char) -> bool {

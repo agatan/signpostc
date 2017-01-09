@@ -198,6 +198,7 @@ impl TokenKind {
             "=>" => TokenKind::FatArrow,
             "<" => TokenKind::Langle,
             ">" => TokenKind::Rangle,
+            ":" => TokenKind::Colon,
             _ => TokenKind::Operator,
         }
     }

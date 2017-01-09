@@ -49,6 +49,10 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::False, Self::parse_bool_literal);
         parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
         parser.register_prefix(TokenKind::Operator, Self::parse_prefix_expr);
+
+        parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
+        parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
+        parser.register_infix(TokenKind::Rangle, Self::parse_infix_expr);
         parser
     }
 
@@ -270,13 +274,21 @@ impl<'a> Parser<'a> {
                 return Err(self.make_error(self.next_token, msg));
             }
         };
-        let left = prefix(self)?;
-        // while !self.next_is_separator() {
-        //     let next_assoc = Assoc::from_token(self.next_token);
-        //     if next_assoc.prec < assoc.prec {
-        //         break;
-        //     }
-        // }
+        let mut left = prefix(self)?;
+        while !self.next_is_separator() {
+            let next_assoc = Assoc::infix_token(self.next_token);
+            if next_assoc.prec < assoc.prec {
+                break;
+            }
+            let infix = match self.get_infix_fn(&self.next_token) {
+                Some(f) => f,
+                None => {
+                    let msg = format!("unexpected token: {}", self.next_token);
+                    return Err(self.make_error(self.next_token, msg));
+                }
+            };
+            left = infix(self, left)?;
+        }
         Ok(left)
     }
 
@@ -330,6 +342,15 @@ impl<'a> Parser<'a> {
         Ok(Expr::Prefix(pos, op, box expr))
     }
 
+    fn parse_infix_expr(&mut self, left: Expr) -> Result<Expr, Error> {
+        let assoc = Assoc::infix_token(self.next_token);
+        let pos = self.next_token.pos();
+        let op = self.next_token.symbol();
+        self.succ_token();
+        let right = self.parse_expr_(assoc)?;
+        Ok(Expr::Infix(pos, box left, op, box right))
+    }
+
     pub fn parse_type(&mut self) -> Type {
         let ty = self.parse_type_();
         match ty {
@@ -367,20 +388,28 @@ impl<'a> Parser<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Prec {
     Lowest,
-    LogicalOr,
-    LogicalAnd,
-    /// `=`, `<`, `>`, ...
+
+    /// assign operations
+    Assign,
+    /// `|`
     Infix0,
-    /// `@`, `^`, ...
+    /// `^`
     Infix1,
-    /// `::`
-    Cons,
-    /// `+`, `-`, ...
+    /// `&`
     Infix2,
-    /// `*`, `/`
+    /// `<`, `>`
     Infix3,
-    /// `**`
+    /// `=`, `!`
     Infix4,
+    /// `:`
+    Infix5,
+    /// `+`, `-`
+    Infix6,
+    /// `*`, `/`, `%`
+    Infix7,
+    /// other special characters
+    Infix8,
+
     Prefix,
     /// never reduced
     Highest,
@@ -388,6 +417,7 @@ enum Prec {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Fixity {
+    NonAssoc,
     Left,
     Right,
 }
@@ -406,12 +436,41 @@ impl Assoc {
         }
     }
 
-    fn from_token(token: Token) -> Assoc {
-        // TODO(agatan)
+    fn infix_token(token: Token) -> Assoc {
         let s = &*token.symbol().as_str();
+        let mut prec = match token.kind() {
+            TokenKind::Langle | TokenKind::Rangle => Prec::Infix3,
+            TokenKind::Operator => {
+                let c = s.chars().next().unwrap();
+                match c {
+                    '|' => Prec::Infix0,
+                    '^' => Prec::Infix1,
+                    '&' => Prec::Infix2,
+                    '<' | '>' => Prec::Infix3,
+                    '=' | '!' => Prec::Infix4,
+                    ':' => Prec::Infix5,
+                    '+' | '-' => Prec::Infix6,
+                    '*' | '/' | '%' => Prec::Infix7,
+                    _ => Prec::Infix8,
+                }
+            }
+            _ => Prec::Highest,
+        };
+        let mut fixity = if s.ends_with(':') {
+            Fixity::Right
+        } else {
+            Fixity::Left
+        };
+
+        // exceptional rule for assignmanets.
+        if s.ends_with('=') {
+            fixity = Fixity::NonAssoc;
+            prec = Prec::Assign;
+        }
+
         Assoc {
-            fixity: Fixity::Left,
-            prec: Prec::Highest,
+            fixity: fixity,
+            prec: prec,
         }
     }
 }
@@ -639,9 +698,11 @@ mod tests {
                 }
                 _ => {
                     assert!(false,
-                            "test[#{}]: expression is not an infix expression. got = {:?}",
+                            "test[#{}]: expression is not an infix expression. got = {:?}, \
+                             errors = {:?}",
                             i,
-                            e);
+                            e,
+                            parser.into_errors());
                 }
             }
         }
