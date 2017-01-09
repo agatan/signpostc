@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Expr {
-        match self.parse_expr_(0) {
+        match self.parse_expr_(Assoc::lowest()) {
             Ok(e) => e,
             Err(e) => {
                 self.annotate_error(e);
@@ -215,7 +215,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expr_(&mut self, prec: Prec) -> Result<Expr, Error> {
+    fn parse_expr_(&mut self, assoc: Assoc) -> Result<Expr, Error> {
         match self.next_token.kind() {
             TokenKind::Int => self.parse_integer_literal(),
             TokenKind::String => self.parse_string_literal(),
@@ -272,7 +272,10 @@ impl<'a> Parser<'a> {
         self.succ_token();
         let pos = self.current_token.pos();
         let op = self.current_token.symbol();
-        let expr = self.parse_expr_(7)?;
+        let expr = self.parse_expr_(Assoc {
+                fixity: Fixity::Right,
+                prec: Prec::Prefix,
+            })?;
         Ok(Expr::Prefix(pos, op, box expr))
     }
 
@@ -310,7 +313,57 @@ impl<'a> Parser<'a> {
     }
 }
 
-type Prec = usize;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Prec {
+    Lowest,
+    LogicalOr,
+    LogicalAnd,
+    /// `=`, `<`, `>`, ...
+    Infix0,
+    /// `@`, `^`, ...
+    Infix1,
+    /// `::`
+    Cons,
+    /// `+`, `-`, ...
+    Infix2,
+    /// `*`, `/`
+    Infix3,
+    /// `**`
+    Infix4,
+    Prefix,
+    /// never reduced
+    Highest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fixity {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Assoc {
+    fixity: Fixity,
+    prec: Prec,
+}
+
+impl Assoc {
+    fn lowest() -> Self {
+        Assoc {
+            fixity: Fixity::Left,
+            prec: Prec::Lowest,
+        }
+    }
+
+    fn from_token(token: Token) -> Assoc {
+        // TODO(agatan)
+        let s = &*token.symbol().as_str();
+        Assoc {
+            fixity: Fixity::Left,
+            prec: Prec::Highest,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

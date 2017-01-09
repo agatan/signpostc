@@ -84,8 +84,6 @@ pub enum TokenKind {
     Operator,
 
     Eq,
-    Pipe,
-    Pipepipe, // to distinguish `|| { 1 }`
 
     Arrow, // ->
     FatArrow, // =>
@@ -136,8 +134,6 @@ impl fmt::Display for TokenKind {
             Ident => "identifier",
             Operator => "operator",
             Eq => "'='",
-            Pipe => "'|'",
-            Pipepipe => "'||'",
             Arrow => "'->'",
             FatArrow => "'=>'",
             Comma => "','",
@@ -196,8 +192,6 @@ impl TokenKind {
     pub fn lookup_operator(s: &str) -> Self {
         match s {
             "=" => TokenKind::Eq,
-            "|" => TokenKind::Pipe,
-            "||" => TokenKind::Pipepipe,
             "->" => TokenKind::Arrow,
             "=>" => TokenKind::FatArrow,
             "<" => TokenKind::Langle,
