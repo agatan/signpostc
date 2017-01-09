@@ -56,11 +56,22 @@ impl<'a> Parser<'a> {
         self.next_token = self.scanner.scan();
     }
 
+    fn skip_newlines(&mut self) {
+        while self.next_is(TokenKind::Newline) {
+            self.succ_token()
+        }
+    }
+
     fn next_is(&self, kind: TokenKind) -> bool {
         self.next_token.kind() == kind
     }
 
-    fn expect_next(&mut self, kind: TokenKind) -> Result<(), Error> {
+    fn expect_without_newline(&mut self, kind: TokenKind) -> Result<(), Error> {
+        self.skip_newlines();
+        self.expect(kind)
+    }
+
+    fn expect(&mut self, kind: TokenKind) -> Result<(), Error> {
         if self.next_is(kind) {
             self.succ_token();
             Ok(())
@@ -94,6 +105,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_decl(&mut self) -> Decl {
+        self.skip_newlines();
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             _ => {
@@ -116,38 +128,38 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_def(&mut self) -> Result<Decl, Error> {
-        self.expect_next(TokenKind::Def)?;
+        self.expect_without_newline(TokenKind::Def)?;
         let pos = self.current_token.pos();
-        self.expect_next(TokenKind::Ident)?;
+        self.expect_without_newline(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         // TODO(agatan): generics parameters
         let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
         let params = self.parse_params()?;
         // TODO(agatan): return type spec
-        let ret_ty = if self.expect_next(TokenKind::Colon).is_ok() {
+        let ret_ty = if self.expect_without_newline(TokenKind::Colon).is_ok() {
             Some(self.parse_type())
         } else {
             None
         };
-        self.expect_next(TokenKind::Lbrace)?;
+        self.expect_without_newline(TokenKind::Lbrace)?;
         let body = self.parse_expr();
-        self.expect_next(TokenKind::Rbrace)?;
+        self.expect_without_newline(TokenKind::Rbrace)?;
         self.succ_token();
 
         Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, ret_ty, body)))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {
-        self.expect_next(TokenKind::Ident)?;
+        self.expect_without_newline(TokenKind::Ident)?;
         let name = self.current_token.symbol();
-        self.expect_next(TokenKind::Colon)?;
+        self.expect_without_newline(TokenKind::Colon)?;
         let ty = self.parse_type();
         Ok(Param::new(name, ty))
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, Error> {
-        self.expect_next(TokenKind::Lparen)?;
-        if self.expect_next(TokenKind::Rparen).is_ok() {
+        self.expect_without_newline(TokenKind::Lparen)?;
+        if self.expect_without_newline(TokenKind::Rparen).is_ok() {
             // no arguments.
             return Ok(Vec::new());
         }
@@ -155,11 +167,11 @@ impl<'a> Parser<'a> {
         loop {
             let param = self.parse_param()?;
             params.push(param);
-            if self.expect_next(TokenKind::Rparen).is_ok() {
+            if self.expect_without_newline(TokenKind::Rparen).is_ok() {
                 break;
             }
-            self.expect_next(TokenKind::Comma)?;
-            if self.expect_next(TokenKind::Rparen).is_ok() {
+            self.expect_without_newline(TokenKind::Comma)?;
+            if self.expect_without_newline(TokenKind::Rparen).is_ok() {
                 // optional trailing comma.
                 break;
             }
@@ -169,7 +181,7 @@ impl<'a> Parser<'a> {
 
     /// TODO(agatan): Define type AST node.
     fn parse_type_param(&mut self) -> Result<Symbol, Error> {
-        self.expect_next(TokenKind::Uident)?;
+        self.expect_without_newline(TokenKind::Uident)?;
         Ok(self.current_token.symbol())
     }
 
@@ -182,16 +194,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_params(&mut self) -> Result<Vec<Symbol>, Error> {
-        self.expect_next(TokenKind::Langle)?;
+        self.expect_without_newline(TokenKind::Langle)?;
         let mut params = Vec::new();
         loop {
             let typ = self.parse_type_param()?;
             params.push(typ);
-            if self.expect_next(TokenKind::Rangle).is_ok() {
+            if self.expect_without_newline(TokenKind::Rangle).is_ok() {
                 break;
             }
-            self.expect_next(TokenKind::Comma)?;
-            if self.expect_next(TokenKind::Rangle).is_ok() {
+            self.expect_without_newline(TokenKind::Comma)?;
+            if self.expect_without_newline(TokenKind::Rangle).is_ok() {
                 // optional trailing comma.
                 break;
             }
@@ -211,6 +223,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr_(&mut self, assoc: Assoc) -> Result<Expr, Error> {
+        self.skip_newlines();
         match self.next_token.kind() {
             TokenKind::Int => self.parse_integer_literal(),
             TokenKind::String => self.parse_string_literal(),
@@ -231,7 +244,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_integer_literal(&mut self) -> Result<Expr, Error> {
-        self.expect_next(TokenKind::Int)?;
+        self.expect_without_newline(TokenKind::Int)?;
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
         let num = sym.as_str().parse::<i64>().expect("integer parse error");
@@ -257,7 +270,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_identifier(&mut self) -> Result<Expr, Error> {
-        self.expect_next(TokenKind::Ident)?;
+        self.expect_without_newline(TokenKind::Ident)?;
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
         Ok(Expr::Ident(pos, sym))
@@ -286,19 +299,19 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_(&mut self) -> Result<Type, Error> {
-        self.expect_next(TokenKind::Uident)?;
+        self.expect_without_newline(TokenKind::Uident)?;
         let base_sym = self.current_token.symbol();
         let mut ty = Type::from_symbol(base_sym);
-        if self.expect_next(TokenKind::Langle).is_ok() {
+        if self.expect_without_newline(TokenKind::Langle).is_ok() {
             let mut args = Vec::new();
             loop {
                 let ty = self.parse_type_()?;
                 args.push(ty);
-                if self.expect_next(TokenKind::Rangle).is_ok() {
+                if self.expect_without_newline(TokenKind::Rangle).is_ok() {
                     break;
                 }
-                self.expect_next(TokenKind::Comma)?;
-                if self.expect_next(TokenKind::Rangle).is_ok() {
+                self.expect_without_newline(TokenKind::Comma)?;
+                if self.expect_without_newline(TokenKind::Rangle).is_ok() {
                     break;
                 }
             }
