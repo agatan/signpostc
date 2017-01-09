@@ -54,6 +54,7 @@ impl<'a> Parser<'a> {
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Rangle, Self::parse_infix_expr);
+        parser.register_infix(TokenKind::Lparen, Self::parse_call_expr);
         parser
     }
 
@@ -80,6 +81,10 @@ impl<'a> Parser<'a> {
             position: position,
             message: msg,
         }
+    }
+
+    pub fn errors(&self) -> ::std::cell::Ref<ErrorList> {
+        self.errors.borrow()
     }
 
     pub fn into_errors(self) -> ErrorList {
@@ -285,8 +290,7 @@ impl<'a> Parser<'a> {
             let infix = match self.get_infix_fn(&self.next_token) {
                 Some(f) => f,
                 None => {
-                    let msg = format!("unexpected token: {}", self.next_token);
-                    return Err(self.make_error(self.next_token, msg));
+                    return Ok(left);
                 }
             };
             left = infix(self, left)?;
@@ -358,6 +362,24 @@ impl<'a> Parser<'a> {
         self.succ_token();
         let right = self.parse_expr_(assoc)?;
         Ok(Expr::Infix(pos, box left, op, box right))
+    }
+
+    fn parse_call_expr(&mut self, f: Expr) -> Result<Expr, Error> {
+        let pos = f.pos();
+        self.expect(TokenKind::Lparen)?;
+        let mut args = Vec::new();
+        loop {
+            if self.expect_without_newline(TokenKind::Rparen).is_ok() {
+                break;
+            }
+            let e = self.parse_expr_(Assoc::lowest())?;
+            args.push(e);
+            if self.expect(TokenKind::Rparen).is_ok() {
+                break;
+            }
+            self.expect(TokenKind::Comma)?;
+        }
+        Ok(Expr::Call(pos, box f, args))
     }
 
     pub fn parse_type(&mut self) -> Type {
@@ -495,6 +517,7 @@ mod tests {
     fn test_parse_def() {
         let input = r#"
             def f(x: Int) {
+                x
             }
         "#;
         let file = File::new(None, input.len());
@@ -504,14 +527,11 @@ mod tests {
                    1,
                    "decls size is not 1: {:?}",
                    program.decls);
+        test_parse_error(&parser);
         let ref decl = program.decls[0];
         let fun_decl = match *decl {
             Decl::Def(_, ref f) => f,
-            _ => {
-                panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
-                               decl,
-                               parser.into_errors()))
-            }
+            _ => panic!(format!("expected Decl::Def, got {:?}", decl)),
         };
         assert_eq!(fun_decl.name.as_str(), "f");
         assert_eq!(fun_decl.params.len(), 1);
@@ -524,10 +544,11 @@ mod tests {
                          ("(x: Int)", 1, vec!["x"]),
                          ("(x: Int, y: Bool)", 2, vec!["x", "y"])];
         for (input, len, names) in tests {
-            let input = format!("def f{} {{ }}", input);
+            let input = format!("def f{} {{ 1 }}", input);
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let program = parser.parse_program();
+            test_parse_error(&parser);
             assert_eq!(program.decls.len(),
                        1,
                        "decls size is not 1: {:?}",
@@ -535,11 +556,7 @@ mod tests {
             let ref decl = program.decls[0];
             let fun_decl = match *decl {
                 Decl::Def(_, ref f) => f,
-                _ => {
-                    panic!(format!("expected Decl::Def, got {:?}: error: {:?}",
-                                   decl,
-                                   parser.into_errors()))
-                }
+                _ => panic!(format!("expected Decl::Def, got {:?}", decl)),
             };
             assert_eq!(fun_decl.name.as_str(), "f");
             assert_eq!(fun_decl.params.len(), len);
@@ -554,10 +571,11 @@ mod tests {
     fn test_parse_def_with_typeparams() {
         let tests = vec![("", 0, vec![]), ("<T>", 1, vec!["T"]), ("<T, U>", 2, vec!["T", "U"])];
         for (i, (input, len, names)) in tests.into_iter().enumerate() {
-            let input = format!("def f{}() {{ }}", input);
+            let input = format!("def f{}() {{ 1 }}", input);
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let program = parser.parse_program();
+            test_parse_error(&parser);
             assert_eq!(program.decls.len(),
                        1,
                        "decls size is not 1: {:?}",
@@ -565,12 +583,7 @@ mod tests {
             let ref decl = program.decls[0];
             let fun_decl = match *decl {
                 Decl::Def(_, ref f) => f,
-                _ => {
-                    panic!(format!("test[#{}]: expected Decl::Def, got {:?}: error: {:?}",
-                                   i,
-                                   decl,
-                                   parser.into_errors()))
-                }
+                _ => panic!(format!("test[#{}]: expected Decl::Def, got {:?}", i, decl)),
             };
             assert_eq!(fun_decl.type_params.len(), len);
             for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {
@@ -589,18 +602,12 @@ mod tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
+            test_parse_error(&parser);
             match e {
                 Expr::Literal(_, actual) => {
                     assert_eq!(actual, expected, "test[#{}]: input = {:?}", i, input)
                 }
-                _ => {
-                    assert!(false,
-                            "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
-                            i,
-                            input,
-                            e,
-                            parser.into_errors())
-                }
+                _ => assert!(false, "test[#{}]: input = {:?}, got = {:?}", i, input, e),
             }
         }
     }
@@ -608,23 +615,11 @@ mod tests {
     #[test]
     fn test_parse_identifier() {
         let tests = vec!["a", "b", "abc"];
-        for (i, input) in tests.into_iter().enumerate() {
+        for input in tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
-            match e {
-                Expr::Ident(_, actual) => {
-                    assert_eq!(actual.as_str(), input, "test[#{}]: input = {:?}", i, input)
-                }
-                _ => {
-                    assert!(false,
-                            "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
-                            i,
-                            input,
-                            e,
-                            parser.into_errors())
-                }
-            }
+            test_identifier(input, e);
         }
     }
 
@@ -641,6 +636,7 @@ mod tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
+            test_parse_error(&parser);
             if let Expr::Prefix(_, op, box Expr::Literal(_, lit)) = e {
                 assert_eq!(op.as_str(),
                            expected_op,
@@ -655,12 +651,7 @@ mod tests {
                            input,
                            lit);
             } else {
-                assert!(false,
-                        "test[#{}]: input = {:?}, got = {:?}, err = {:?}",
-                        i,
-                        input,
-                        e,
-                        parser.into_errors())
+                assert!(false, "test[#{}]: input = {:?}, got = {:?}", i, input, e)
             }
         }
     }
@@ -681,23 +672,11 @@ mod tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
+            test_parse_error(&parser);
             match e {
-                Expr::Infix(_,
-                            box Expr::Literal(_, Literal::Int(lhs)),
-                            op,
-                            box Expr::Literal(_, Literal::Int(rhs))) => {
-                    assert_eq!(lhs,
-                               expected_lhs,
-                               "test[#{}]: lhs is not {}, got {}",
-                               i,
-                               expected_lhs,
-                               lhs);
-                    assert_eq!(rhs,
-                               expected_rhs,
-                               "test[#{}]: rhs is not {}, got {}",
-                               i,
-                               expected_rhs,
-                               rhs);
+                Expr::Infix(_, box lhs, op, box rhs) => {
+                    test_integer(expected_lhs, lhs);
+                    test_integer(expected_rhs, rhs);
                     assert_eq!(op.as_str(),
                                expected_op,
                                "test[#{}]: op is not {:?}, got {:?}",
@@ -707,11 +686,9 @@ mod tests {
                 }
                 _ => {
                     assert!(false,
-                            "test[#{}]: expression is not an infix expression. got = {:?}, \
-                             errors = {:?}",
+                            "test[#{}]: expression is not an infix expression. got = {:?}",
                             i,
-                            e,
-                            parser.into_errors());
+                            e);
                 }
             }
         }
@@ -724,15 +701,38 @@ mod tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let e = parser.parse_expr();
+            test_parse_error(&parser);
             match e {
                 Expr::Paren(_, _) => (),
+                _ => assert!(false, "test[#{}]: input = {}, got = {:?}", i, input, e),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_call() {
+        let tests = vec![("f()", vec![]),
+                         ("f(1)", vec![1]),
+                         ("f(1, 2)", vec![1, 2]),
+                         ("f(1, 2,)", vec![1, 2]),
+                         ("f(\n1,\n 2,\n)", vec![1, 2])];
+        for (i, (input, n)) in tests.into_iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, &input);
+            let e = parser.parse_expr();
+            test_parse_error(&parser);
+            match e {
+                Expr::Call(_, f, args) => {
+                    test_identifier("f", *f);
+                    for (arg, expected) in args.into_iter().zip(n.into_iter()) {
+                        test_integer(expected, arg);
+                    }
+                }
                 _ => {
                     assert!(false,
-                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            "test[#{}]: expression is not a call: got = {:?}",
                             i,
-                            input,
-                            e,
-                            parser.into_errors())
+                            e)
                 }
             }
         }
@@ -752,12 +752,27 @@ mod tests {
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let ty = parser.parse_type();
-            assert_eq!(ty,
-                       expected_ty,
-                       "test[#{}]: input = {}, err = {:?}",
-                       i,
-                       input,
-                       parser.into_errors());
+            test_parse_error(&parser);
+            assert_eq!(ty, expected_ty, "test[#{}]: input = {}", i, input);
+
         }
+    }
+
+    fn test_identifier(expected: &str, e: Expr) {
+        match e {
+            Expr::Ident(_, name) => assert_eq!(name.as_str(), expected),
+            _ => assert!(false, "expression is not an identifier: got {:?}", e),
+        }
+    }
+
+    fn test_integer(expected: i64, e: Expr) {
+        match e {
+            Expr::Literal(_, Literal::Int(i)) => assert_eq!(i, expected),
+            _ => assert!(false, "expression is not an integer literal: got {:?}", e),
+        }
+    }
+
+    fn test_parse_error<'a>(p: &Parser<'a>) {
+        assert!(p.errors().is_empty(), "parse error: {:?}", p.errors());
     }
 }

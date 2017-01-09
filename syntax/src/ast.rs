@@ -73,6 +73,21 @@ pub enum Expr {
     Prefix(Pos, Symbol, Box<Expr>),
     Infix(Pos, Box<Expr>, Symbol, Box<Expr>),
     Paren(Pos, Box<Expr>),
+    Call(Pos, Box<Expr>, Vec<Expr>),
+}
+
+impl Expr {
+    pub fn pos(&self) -> Pos {
+        match *self {
+            Expr::Error => Pos::dummy(),
+            Expr::Literal(p, _) |
+            Expr::Ident(p, _) |
+            Expr::Prefix(p, _, _) |
+            Expr::Infix(p, _, _, _) |
+            Expr::Paren(p, _) |
+            Expr::Call(p, _, _) => p,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,6 +209,13 @@ trait Visitor {
                 self.visit_expr(rhs)
             }
             Expr::Paren(_, ref e) => self.visit_expr(e),
+            Expr::Call(_, ref f, ref args) => {
+                visit!(self.visit_expr(f));
+                for arg in args {
+                    visit!(self.visit_expr(arg));
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -370,6 +392,24 @@ impl<T: Write> Visitor for Dumper<T> {
             }
             Expr::Paren(_, ref e) => {
                 visit!(self.visit_expr(e));
+            }
+            Expr::Call(_, ref f, ref args) => {
+                __try_dump!(self, "call:");
+                {
+                    let mut w = self.enter();
+                    __try_dump!(w, "function:");
+                    {
+                        let mut w = w.enter();
+                        visit!(w.visit_expr(f));
+                    }
+                    __try_dump!(w, "arguments:");
+                    {
+                        let mut w = w.enter();
+                        for arg in args {
+                            visit!(w.visit_expr(arg));
+                        }
+                    }
+                }
             }
         }
         VisitState::Run
