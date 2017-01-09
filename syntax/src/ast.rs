@@ -72,6 +72,7 @@ pub enum Expr {
     Ident(Pos, Symbol),
     Prefix(Pos, Symbol, Box<Expr>),
     Infix(Pos, Box<Expr>, Symbol, Box<Expr>),
+    Paren(Pos, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,6 +193,7 @@ trait Visitor {
                 visit!(self.visit_expr(lhs));
                 self.visit_expr(rhs)
             }
+            Expr::Paren(_, ref e) => self.visit_expr(e),
         }
     }
 
@@ -267,7 +269,6 @@ impl<T> Dumper<T> {
     fn exit(&mut self) {
         self.depth -= 1;
     }
-
 }
 
 impl<T: Write> Dumper<T> {
@@ -366,6 +367,9 @@ impl<T: Write> Visitor for Dumper<T> {
                     visit!(w.visit_expr(lhs));
                     visit!(w.visit_expr(rhs));
                 }
+            }
+            Expr::Paren(_, ref e) => {
+                visit!(self.visit_expr(e));
             }
         }
         VisitState::Run

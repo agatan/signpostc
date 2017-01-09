@@ -49,6 +49,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::False, Self::parse_bool_literal);
         parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
         parser.register_prefix(TokenKind::Operator, Self::parse_prefix_expr);
+        parser.register_prefix(TokenKind::Lparen, Self::parse_paren_expr);
 
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
@@ -291,6 +292,13 @@ impl<'a> Parser<'a> {
             left = infix(self, left)?;
         }
         Ok(left)
+    }
+
+    fn parse_paren_expr(&mut self) -> Result<Expr, Error> {
+        self.expect_without_newline(TokenKind::Lparen)?;
+        let pos = self.current_token.pos();
+        let e = self.parse_expr_(Assoc::lowest())?;
+        Ok(Expr::Paren(pos, box e))
     }
 
     fn parse_integer_literal(&mut self) -> Result<Expr, Error> {
@@ -704,6 +712,27 @@ mod tests {
                             i,
                             e,
                             parser.into_errors());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_paren() {
+        let tests = vec!["(1 + 2)", "(\n 1 + 2 )", "(1 + \n 2)", "(1 + 2 \n )"];
+        for (i, input) in tests.iter().enumerate() {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, &input);
+            let e = parser.parse_expr();
+            match e {
+                Expr::Paren(_, _) => (),
+                _ => {
+                    assert!(false,
+                            "test[#{}]: input = {}, got = {:?}, err = {:?}",
+                            i,
+                            input,
+                            e,
+                            parser.into_errors())
                 }
             }
         }
