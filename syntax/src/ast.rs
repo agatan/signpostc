@@ -229,7 +229,28 @@ macro_rules! __try_dump {
     }
 }
 
-impl<T: Write> Dumper<T> {
+struct Indent<'a, T: 'a>(&'a mut Dumper<T>);
+
+impl<'a, T> ::std::ops::Drop for Indent<'a, T> {
+    fn drop(&mut self) {
+        self.0.exit();
+    }
+}
+
+impl<'a, T> ::std::ops::Deref for Indent<'a, T> {
+    type Target = Dumper<T>;
+    fn deref(&self) -> &Dumper<T> {
+        self.0
+    }
+}
+
+impl<'a, T> ::std::ops::DerefMut for Indent<'a, T> {
+    fn deref_mut(&mut self) -> &mut Dumper<T> {
+        self.0
+    }
+}
+
+impl<T> Dumper<T> {
     pub fn new(w: T) -> Self {
         Dumper {
             indent: 2,
@@ -238,14 +259,18 @@ impl<T: Write> Dumper<T> {
         }
     }
 
-    fn into(&mut self) {
+    fn enter<'a>(&'a mut self) -> Indent<'a, T> {
         self.depth += 1;
+        Indent(self)
     }
 
     fn exit(&mut self) {
         self.depth -= 1;
     }
 
+}
+
+impl<T: Write> Dumper<T> {
     fn writeln(&mut self, args: fmt::Arguments) -> io::Result<()> {
         for _ in 0..(self.indent * self.depth) {
             self.w.write_all(b" ")?;
@@ -257,15 +282,13 @@ impl<T: Write> Dumper<T> {
     fn dump_param(&mut self, param: &Param) -> VisitState<io::Error> {
         __try_dump!(self, "param:");
         {
-            self.into();
-            __try_dump!(self, "name: {}", param.name.as_str());
-            __try_dump!(self, "type:");
+            let mut w = self.enter();
+            __try_dump!(w, "name: {}", param.name.as_str());
+            __try_dump!(w, "type:");
             {
-                self.into();
-                visit!(self.visit_ty(&param.ty));
-                self.exit();
+                let mut w = w.enter();
+                visit!(w.visit_ty(&param.ty));
             }
-            self.exit();
         }
         VisitState::Run
     }
@@ -282,37 +305,32 @@ impl<T: Write> Visitor for Dumper<T> {
             }
             Decl::Def(_, ref f) => {
                 __try_dump!(self, "def:");
-                self.into();
-                __try_dump!(self, "name: {}", f.name.as_str());
-                __try_dump!(self, "type_params:");
+                let mut w = self.enter();
+                __try_dump!(w, "name: {}", f.name.as_str());
+                __try_dump!(w, "type_params:");
                 {
-                    self.into();
+                    let mut w = w.enter();
                     for ty in f.type_params.iter() {
-                        __try_dump!(self, "PARAM: {}", ty.as_str());
+                        __try_dump!(w, "PARAM: {}", ty.as_str());
                     }
-                    self.exit();
                 }
-                __try_dump!(self, "params:");
+                __try_dump!(w, "params:");
                 {
-                    self.into();
+                    let mut w = w.enter();
                     for param in f.params.iter() {
-                        visit!(self.dump_param(param));
+                        visit!(w.dump_param(param));
                     }
-                    self.exit();
                 }
-                __try_dump!(self, "return:");
+                __try_dump!(w, "return:");
                 {
-                    self.into();
-                    visit!(self.visit_ty(&f.ret));
-                    self.exit();
+                    let mut w = w.enter();
+                    visit!(w.visit_ty(&f.ret));
                 }
-                __try_dump!(self, "body:");
+                __try_dump!(w, "body:");
                 {
-                    self.into();
-                    visit!(self.visit_expr(&f.body));
-                    self.exit();
+                    let mut w = w.enter();
+                    visit!(w.visit_expr(&f.body));
                 }
-                self.exit();
                 VisitState::Run
             }
         }
@@ -335,20 +353,18 @@ impl<T: Write> Visitor for Dumper<T> {
             Expr::Prefix(_, op, ref e) => {
                 __try_dump!(self, "prefix op:");
                 {
-                    self.into();
-                    __try_dump!(self, "op: {}", op.as_str());
-                    visit!(self.visit_expr(e));
-                    self.exit();
+                    let mut w = self.enter();
+                    __try_dump!(w, "op: {}", op.as_str());
+                    visit!(w.visit_expr(e));
                 }
             }
             Expr::Infix(_, ref lhs, op, ref rhs) => {
                 __try_dump!(self, "infix op:");
                 {
-                    self.into();
-                    __try_dump!(self, "op: {}", op.as_str());
-                    visit!(self.visit_expr(lhs));
-                    visit!(self.visit_expr(rhs));
-                    self.exit();
+                    let mut w = self.enter();
+                    __try_dump!(w, "op: {}", op.as_str());
+                    visit!(w.visit_expr(lhs));
+                    visit!(w.visit_expr(rhs));
                 }
             }
         }
@@ -372,20 +388,18 @@ impl<T: Write> Visitor for Dumper<T> {
             Type::App(ref base, ref args) => {
                 __try_dump!(self, "App:");
                 {
-                    self.into();
-                    __try_dump!(self, "base:");
+                    let mut w = self.enter();
+                    __try_dump!(w, "base:");
                     {
-                        self.into();
-                        visit!(self.visit_ty(base));
-                        self.exit();
+                        let mut w = w.enter();
+                        visit!(w.visit_ty(base));
                     }
-                    __try_dump!(self, "args:");
+                    __try_dump!(w, "args:");
                     {
-                        self.into();
+                        let mut w = w.enter();
                         for arg in args {
-                            visit!(self.visit_ty(arg));
+                            visit!(w.visit_ty(arg));
                         }
-                        self.exit();
                     }
                 }
             }
