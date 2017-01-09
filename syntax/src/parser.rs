@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use token::{Token, TokenKind};
 use symbol::Symbol;
@@ -8,7 +9,6 @@ use scanner::Scanner;
 use errors::{ErrorList, Error};
 use ast::{Program, Decl, Param, FunDecl, Type, Expr, Literal};
 
-#[derive(Debug)]
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
     errors: Rc<RefCell<ErrorList>>,
@@ -17,7 +17,13 @@ pub struct Parser<'a> {
     next_token: Token,
 
     error_count: usize,
+
+    prefix_func_map: HashMap<TokenKind, PrefixFn<'a>>,
+    infix_func_map: HashMap<TokenKind, InfixFn<'a>>,
 }
+
+type PrefixFn<'a> = fn(&mut Parser<'a>) -> Result<Expr, Error>;
+type InfixFn<'a> = fn(&mut Parser<'a>, Expr) -> Result<Expr, Error>;
 
 impl<'a> Parser<'a> {
     pub fn new(file: File, src: &'a str) -> Self {
@@ -25,7 +31,7 @@ impl<'a> Parser<'a> {
         let mut sc = Scanner::new(file, src, errors.clone());
         let cur_token = Token::dummy();
         let next_token = sc.scan();
-        Parser {
+        let mut parser = Parser {
             scanner: sc,
             errors: errors,
 
@@ -33,7 +39,33 @@ impl<'a> Parser<'a> {
             next_token: next_token,
 
             error_count: 0,
-        }
+
+            prefix_func_map: HashMap::new(),
+            infix_func_map: HashMap::new(),
+        };
+        parser.register_prefix(TokenKind::Int, Self::parse_integer_literal);
+        parser.register_prefix(TokenKind::String, Self::parse_string_literal);
+        parser.register_prefix(TokenKind::True, Self::parse_bool_literal);
+        parser.register_prefix(TokenKind::False, Self::parse_bool_literal);
+        parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
+        parser.register_prefix(TokenKind::Operator, Self::parse_prefix_expr);
+        parser
+    }
+
+    fn register_prefix(&mut self, kind: TokenKind, f: PrefixFn<'a>) {
+        self.prefix_func_map.insert(kind, f);
+    }
+
+    fn register_infix(&mut self, kind: TokenKind, f: InfixFn<'a>) {
+        self.infix_func_map.insert(kind, f);
+    }
+
+    fn get_prefix_fn(&self, token: &Token) -> Option<PrefixFn<'a>> {
+        self.prefix_func_map.get(&token.kind()).map(|&f| f)
+    }
+
+    fn get_infix_fn(&self, token: &Token) -> Option<InfixFn<'a>> {
+        self.infix_func_map.get(&token.kind()).map(|&f| f)
     }
 
     pub fn into_errors(self) -> ErrorList {
@@ -64,6 +96,11 @@ impl<'a> Parser<'a> {
 
     fn next_is(&self, kind: TokenKind) -> bool {
         self.next_token.kind() == kind
+    }
+
+    fn next_is_separator(&self) -> bool {
+        let kind = self.next_token.kind();
+        kind == TokenKind::EOF || kind == TokenKind::Newline || kind == TokenKind::Semicolon
     }
 
     fn expect_without_newline(&mut self, kind: TokenKind) -> Result<(), Error> {
@@ -224,23 +261,27 @@ impl<'a> Parser<'a> {
 
     fn parse_expr_(&mut self, assoc: Assoc) -> Result<Expr, Error> {
         self.skip_newlines();
-        match self.next_token.kind() {
-            TokenKind::Int => self.parse_integer_literal(),
-            TokenKind::String => self.parse_string_literal(),
-            TokenKind::True | TokenKind::False => self.parse_bool_literal(),
-            TokenKind::Ident => self.parse_identifier(),
-            TokenKind::Operator if self.next_token.is_prefix_operator() => self.parse_prefix_expr(),
-            _ => {
+        let prefix = match self.get_prefix_fn(&self.next_token) {
+            Some(f) => f,
+            None => {
                 let pos = self.next_token.pos();
                 let position = self.position(pos);
                 let msg = format!("unexpected token: {}. expression expected.",
                                   self.next_token);
-                Err(Error {
+                return Err(Error {
                     position: position,
                     message: msg,
-                })
+                });
             }
-        }
+        };
+        let left = prefix(self)?;
+        // while !self.next_is_separator() {
+        //     let next_assoc = Assoc::from_token(self.next_token);
+        //     if next_assoc.prec < assoc.prec {
+        //         break;
+        //     }
+        // }
+        Ok(left)
     }
 
     fn parse_integer_literal(&mut self) -> Result<Expr, Error> {
