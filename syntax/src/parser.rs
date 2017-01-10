@@ -287,10 +287,13 @@ impl<'a> Parser<'a> {
             if next_assoc.prec < assoc.prec {
                 break;
             }
+            if assoc.fixity == Fixity::Left && next_assoc.prec == assoc.prec {
+                break;
+            }
             let infix = match self.get_infix_fn(&self.next_token) {
                 Some(f) => f,
                 None => {
-                    return Ok(left);
+                    break;
                 }
             };
             left = infix(self, left)?;
@@ -448,7 +451,6 @@ enum Prec {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Fixity {
-    NonAssoc,
     Left,
     Right,
 }
@@ -495,7 +497,7 @@ impl Assoc {
 
         // exceptional rule for assignmanets.
         if s.ends_with('=') {
-            fixity = Fixity::NonAssoc;
+            fixity = Fixity::Right;
             prec = Prec::Assign;
         }
 
