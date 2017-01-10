@@ -697,6 +697,27 @@ mod tests {
     }
 
     #[test]
+    fn test_infix_precedence() {
+        let input = "1 + 2 :: 3";
+        fn make_expr(i: i64) -> Expr {
+            Expr::Literal(Pos::dummy(), Literal::Int(i))
+        }
+        let p = Pos::dummy();
+        let expected = Expr::Infix(p,
+                                   box Expr::Infix(p,
+                                                   box make_expr(1),
+                                                   Symbol::intern("+"),
+                                                   box make_expr(2)),
+                                   Symbol::intern("::"),
+                                   box make_expr(3));
+        let file = File::new(None, input.len());
+        let mut parser = Parser::new(file, input);
+        let e = parser.parse_expr();
+        test_parse_error(&parser);
+        assert_eq!(e, expected);
+    }
+
+    #[test]
     fn test_parse_paren() {
         let tests = vec!["(1 + 2)", "(\n 1 + 2 )", "(1 + \n 2)", "(1 + 2 \n )"];
         for (i, input) in tests.iter().enumerate() {

@@ -56,8 +56,17 @@ impl fmt::Display for Position {
 /// `Pos` is a compact representation of `Position`.
 /// Since each AST node contains its own `Pos`, `Position` is too big.
 /// To convert `Pos` to `Position`, use `File` struct.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialOrd, Ord, Hash)]
 pub struct Pos(Option<usize>);
+
+impl PartialEq for Pos {
+    fn eq(&self, other: &Pos) -> bool {
+        match (self.0, other.0) {
+            (None, _) | (_, None) => true,
+            (Some(lhs), Some(rhs)) => lhs == rhs,
+        }
+    }
+}
 
 impl Pos {
     pub fn dummy() -> Self {
