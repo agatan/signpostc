@@ -4,11 +4,7 @@ use std::env;
 use std::io::prelude::*;
 use std::io;
 use std::fs;
-use std::rc::Rc;
 
-use syntax::scanner::Scanner;
-use syntax::position;
-use syntax::token::TokenKind;
 use syntax::ast;
 
 const PROMPT: &'static str = ">> ";
@@ -19,20 +15,15 @@ fn repl() {
     io::stdout().flush().unwrap();
     for line in stdin.lock().lines() {
         let line = line.expect("failed to read line from stdin");
-        let file = position::File::new(None, line.len());
-        let errors = Rc::default();
-        let mut sc = Scanner::new(file, &line, errors);
-        loop {
-            let token = sc.scan();
-            println!("{:?}", token);
-            if token.kind() == TokenKind::EOF {
-                break;
+        let parse_result = syntax::parse_expr(&line);
+
+        match parse_result {
+            Ok(expr) => {
+                ast::dump_expression(io::stdout(), &expr).unwrap();
             }
-        }
-        let parse_result = syntax::parse_file("stdin", &line);
-        println!("{:?}", parse_result);
-        if let Ok(prog) = parse_result {
-            ast::dump_program(io::stdout(), &prog).unwrap();
+            Err(e) => {
+                println!("errors: {:?}", e);
+            }
         }
         print!("{}", PROMPT);
         io::stdout().flush().unwrap();

@@ -456,3 +456,8 @@ pub fn dump_program<T: Write>(w: T, prog: &Program) -> Result<(), io::Error> {
     let mut dumper = Dumper::new(w);
     dumper.visit_program(prog).into()
 }
+
+pub fn dump_expression<T: Write>(w: T, expr: &Expr) -> Result<(), io::Error> {
+    let mut dumper = Dumper::new(w);
+    dumper.visit_expr(expr).into()
+}
