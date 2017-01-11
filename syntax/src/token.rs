@@ -90,6 +90,7 @@ pub enum TokenKind {
     FatArrow, // =>
 
     // Delimiters
+    Dot,
     Comma,
     Colon,
     Semicolon,
@@ -138,6 +139,7 @@ impl fmt::Display for TokenKind {
             Eq => "'='",
             Arrow => "'->'",
             FatArrow => "'=>'",
+            Dot => "'.'",
             Comma => "','",
             Colon => "':'",
             Semicolon => "';'",

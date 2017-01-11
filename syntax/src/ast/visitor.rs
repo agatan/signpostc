@@ -81,6 +81,13 @@ pub trait Visitor {
                 }
                 VisitState::Run
             }
+            ExprKind::Ufcs(ref base, _, ref args) => {
+                visit!(self.visit_expr(base));
+                for arg in args {
+                    visit!(self.visit_expr(arg));
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -167,7 +174,7 @@ impl<T: Write> Visitor for Dumper<T> {
     fn visit_decl(&mut self, decl: &Decl) -> VisitState<Self::Error> {
         match *decl {
             Decl::Error => {
-                try_visit!(self.writeln(format_args!("error:")));
+                __try_dump!(self, "error:");
                 VisitState::Run
             }
             Decl::Def(_, ref f) => {
@@ -191,16 +198,12 @@ impl<T: Write> Visitor for Dumper<T> {
                     match f.ret {
                         Some(ref ty) => {
                             __try_dump!(this, "return:");
-                            this.with_indent(|this| {
-                                this.visit_ty(ty)
-                            });
+                            this.with_indent(|this| this.visit_ty(ty));
                         }
                         None => __try_dump!(this, "return: (default)"),
                     }
                     __try_dump!(this, "body:");
-                    this.with_indent(|this| {
-                        this.visit_expr(&f.body)
-                    })
+                    this.with_indent(|this| this.visit_expr(&f.body))
                 })
             }
         }
@@ -243,17 +246,28 @@ impl<T: Write> Visitor for Dumper<T> {
                 __try_dump!(self, "call:");
                 self.with_indent(|this| {
                     __try_dump!(this, "function:");
-                    this.with_indent(|this| {
-                        this.visit_expr(f)
-                    });
+                    this.with_indent(|this| this.visit_expr(f));
                     __try_dump!(this, "arguments:");
                     this.with_indent(|this| {
                         for arg in args {
                             visit!(this.visit_expr(arg));
                         }
                         VisitState::Run
-                    });
-                    VisitState::Run
+                    })
+                });
+            }
+            ExprKind::Ufcs(ref base, fname, ref args) => {
+                __try_dump!(self, "ufcs:");
+                self.with_indent(|this| {
+                    visit!(this.visit_expr(base));
+                    __try_dump!(this, "name: {}", fname.as_str());
+                    __try_dump!(this, "arguments:");
+                    this.with_indent(|this| {
+                        for arg in args {
+                            visit!(this.visit_expr(arg));
+                        }
+                        VisitState::Run
+                    })
                 });
             }
         }
@@ -275,8 +289,7 @@ impl<T: Write> Visitor for Dumper<T> {
                             visit!(this.visit_ty(arg));
                         }
                         VisitState::Run
-                    });
-                    VisitState::Run
+                    })
                 });
             }
         }

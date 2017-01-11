@@ -117,13 +117,22 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
+    /// Placeholder to notate error
     Error,
+    /// `1`, `"foo"`, `true`, ...
     Literal(Literal),
+    /// `foo`
     Ident(Symbol),
+    /// `-2`
     Prefix(Symbol, Box<Expr>),
+    /// `1 + 2`
     Infix(Box<Expr>, Symbol, Box<Expr>),
+    /// `(1 + 2)`
     Paren(Box<Expr>),
+    /// `f(1, 2)`
     Call(Box<Expr>, Vec<Expr>),
+    /// `x.method(args)`
+    Ufcs(Box<Expr>, Symbol, Vec<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

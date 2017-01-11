@@ -59,6 +59,7 @@ impl<'a> Parser<'a> {
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Rangle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Lparen, Self::parse_call_expr);
+        parser.register_infix(TokenKind::Dot, Self::parse_ufcs_expr);
         parser
     }
 
@@ -381,6 +382,20 @@ impl<'a> Parser<'a> {
 
     fn parse_call_expr(&mut self, f: Expr) -> Result<Expr, Error> {
         let pos = f.pos;
+        let args = self.parse_arguments()?;
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Call(box f, args)))
+    }
+
+    fn parse_ufcs_expr(&mut self, base: Expr) -> Result<Expr, Error> {
+        let pos = base.pos;
+        self.expect(TokenKind::Dot)?;
+        self.expect_without_newline(TokenKind::Ident)?;
+        let fname = self.current_token.symbol();
+        let args = self.parse_arguments()?;
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Ufcs(box base, fname, args)))
+    }
+
+    fn parse_arguments(&mut self) -> Result<Vec<Expr>, Error> {
         self.expect(TokenKind::Lparen)?;
         let mut args = Vec::new();
         loop {
@@ -394,7 +409,7 @@ impl<'a> Parser<'a> {
             }
             self.expect(TokenKind::Comma)?;
         }
-        Ok(Expr::new(self.next_id(), pos, ExprKind::Call(box f, args)))
+        Ok(args)
     }
 
     pub fn parse_type(&mut self) -> Ty {
@@ -463,6 +478,8 @@ enum Prec {
     Infix8,
 
     Prefix,
+    /// call expression
+    Call,
     /// never reduced
     Highest,
 }
@@ -488,6 +505,15 @@ impl Assoc {
     }
 
     fn infix_token(token: Token) -> Assoc {
+        match token.kind() {
+            TokenKind::Lparen | TokenKind::Dot => {
+                return Assoc {
+                    fixity: Fixity::Left,
+                    prec: Prec::Call,
+                };
+            }
+            _ => (),
+        }
         let s = &*token.symbol().as_str();
         let mut prec = match token.kind() {
             TokenKind::Langle | TokenKind::Rangle => Prec::Infix3,
@@ -777,6 +803,33 @@ mod tests {
                 }
                 _ => panic!("test[#{}]: expression is not a call: got = {:?}", i, e),
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_ufcs() {
+        let input = "x.f(1, 2).g()";
+        let file = File::new(None, input.len());
+        let mut parser = Parser::new(file, input);
+        let e = parser.parse_expr();
+        test_parse_error(&parser);
+        match e.node {
+            ExprKind::Ufcs(box base, fname, args) => {
+                assert_eq!("g", fname.as_str());
+                assert_eq!(args.len(), 0);
+                match base.node {
+                    ExprKind::Ufcs(box base, fname, args) => {
+                        assert_eq!("f", fname.as_str());
+                        assert_eq!(args.len(), 2);
+                        for (expected, arg) in vec![1, 2].into_iter().zip(args.into_iter()) {
+                            test_integer(expected, arg);
+                        }
+                        test_identifier("x", base);
+                    }
+                    _ => panic!("base is not an UFCS expression, got = {:?}", base.node),
+                }
+            }
+            _ => panic!("e is not an UFCS expression, got = {:?}", e.node),
         }
     }
 

@@ -99,6 +99,7 @@ impl<'a> Scanner<'a> {
             let ch = self.ch;
             self.next();
             match ch {
+                '.' => Token::new(pos, TokenKind::Dot, self.substr_from(offset)),
                 ',' => Token::new(pos, TokenKind::Comma, self.substr_from(offset)),
                 ':' => Token::new(pos, TokenKind::Colon, self.substr_from(offset)),
                 ';' => Token::new(pos, TokenKind::Semicolon, self.substr_from(offset)),
@@ -215,6 +216,7 @@ mod tests {
                 true => "true",
                 false => "\n\a\b\\\"",
             }
+            x.f
         "#;
         let tests = vec![// token type, literal
                          (TokenKind::Newline, "\n"),
@@ -287,6 +289,11 @@ mod tests {
                          (TokenKind::Comma, ","),
                          (TokenKind::Newline, "\n"),
                          (TokenKind::Rbrace, "}"),
+                         (TokenKind::Newline, "\n"),
+
+                         (TokenKind::Ident, "x"),
+                         (TokenKind::Dot, "."),
+                         (TokenKind::Ident, "f"),
                          (TokenKind::Newline, "\n"),
 
                          (TokenKind::EOF, "")];
