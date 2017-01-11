@@ -7,7 +7,7 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{Program, Decl, Param, FunDecl, Type, Expr, Literal};
+use ast::{NodeId, Program, Decl, Param, FunDecl, Type, Expr, ExprKind, Literal};
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -20,6 +20,8 @@ pub struct Parser<'a> {
 
     prefix_func_map: HashMap<TokenKind, PrefixFn<'a>>,
     infix_func_map: HashMap<TokenKind, InfixFn<'a>>,
+
+    last_node_id: NodeId,
 }
 
 type PrefixFn<'a> = fn(&mut Parser<'a>) -> Result<Expr, Error>;
@@ -42,6 +44,8 @@ impl<'a> Parser<'a> {
 
             prefix_func_map: HashMap::new(),
             infix_func_map: HashMap::new(),
+
+            last_node_id: NodeId::new(0),
         };
         parser.register_prefix(TokenKind::Int, Self::parse_integer_literal);
         parser.register_prefix(TokenKind::String, Self::parse_string_literal);
@@ -96,6 +100,12 @@ impl<'a> Parser<'a> {
     fn annotate_error(&mut self, err: Error) {
         self.errors.borrow_mut().add_error(err);
         self.error_count += 1;
+    }
+
+    fn next_id(&mut self) -> NodeId {
+        let id = self.last_node_id.as_u32();
+        self.last_node_id = NodeId::from_u32(id + 1);
+        self.last_node_id
     }
 
     fn position(&self, pos: Pos) -> Position {
@@ -266,7 +276,7 @@ impl<'a> Parser<'a> {
             Err(e) => {
                 self.annotate_error(e);
                 // TODO(agatan): sync with next exprssesion
-                Expr::Error
+                Expr::error()
             }
         }
     }
@@ -305,7 +315,7 @@ impl<'a> Parser<'a> {
         self.expect_without_newline(TokenKind::Lparen)?;
         let pos = self.current_token.pos();
         let e = self.parse_expr_(Assoc::lowest())?;
-        Ok(Expr::Paren(pos, box e))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Paren(box e)))
     }
 
     fn parse_integer_literal(&mut self) -> Result<Expr, Error> {
@@ -313,14 +323,14 @@ impl<'a> Parser<'a> {
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
         let num = sym.as_str().parse::<i64>().expect("integer parse error");
-        Ok(Expr::Literal(pos, Literal::Int(num)))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Literal(Literal::Int(num))))
     }
 
     fn parse_string_literal(&mut self) -> Result<Expr, Error> {
         self.succ_token();
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
-        Ok(Expr::Literal(pos, Literal::String(sym)))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Literal(Literal::String(sym))))
     }
 
     fn parse_bool_literal(&mut self) -> Result<Expr, Error> {
@@ -331,14 +341,14 @@ impl<'a> Parser<'a> {
         } else {
             Literal::Bool(false)
         };
-        Ok(Expr::Literal(pos, lit))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Literal(lit)))
     }
 
     fn parse_identifier(&mut self) -> Result<Expr, Error> {
         self.expect_without_newline(TokenKind::Ident)?;
         let pos = self.current_token.pos();
         let sym = self.current_token.symbol();
-        Ok(Expr::Ident(pos, sym))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Ident(sym)))
     }
 
     fn parse_prefix_expr(&mut self) -> Result<Expr, Error> {
@@ -355,7 +365,7 @@ impl<'a> Parser<'a> {
                 fixity: Fixity::Right,
                 prec: Prec::Prefix,
             })?;
-        Ok(Expr::Prefix(pos, op, box expr))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Prefix(op, box expr)))
     }
 
     fn parse_infix_expr(&mut self, left: Expr) -> Result<Expr, Error> {
@@ -364,11 +374,13 @@ impl<'a> Parser<'a> {
         let op = self.next_token.symbol();
         self.succ_token();
         let right = self.parse_expr_(assoc)?;
-        Ok(Expr::Infix(pos, box left, op, box right))
+        Ok(Expr::new(self.next_id(),
+                     pos,
+                     ExprKind::Infix(box left, op, box right)))
     }
 
     fn parse_call_expr(&mut self, f: Expr) -> Result<Expr, Error> {
-        let pos = f.pos();
+        let pos = f.pos;
         self.expect(TokenKind::Lparen)?;
         let mut args = Vec::new();
         loop {
@@ -382,7 +394,7 @@ impl<'a> Parser<'a> {
             }
             self.expect(TokenKind::Comma)?;
         }
-        Ok(Expr::Call(pos, box f, args))
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Call(box f, args)))
     }
 
     pub fn parse_type(&mut self) -> Type {
@@ -605,8 +617,8 @@ mod tests {
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
             test_parse_error(&parser);
-            match e {
-                Expr::Literal(_, actual) => {
+            match e.node {
+                ExprKind::Literal(actual) => {
                     assert_eq!(actual, expected, "test[#{}]: input = {:?}", i, input)
                 }
                 _ => assert!(false, "test[#{}]: input = {:?}, got = {:?}", i, input, e),
@@ -639,7 +651,7 @@ mod tests {
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
             test_parse_error(&parser);
-            if let Expr::Prefix(_, op, box Expr::Literal(_, lit)) = e {
+            if let ExprKind::Prefix(op, box Expr { node: ExprKind::Literal(lit), .. }) = e.node {
                 assert_eq!(op.as_str(),
                            expected_op,
                            "test[#{}]: input = {:?}, got op = {:?}",
@@ -675,8 +687,8 @@ mod tests {
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
             test_parse_error(&parser);
-            match e {
-                Expr::Infix(_, box lhs, op, box rhs) => {
+            match e.node {
+                ExprKind::Infix(box lhs, op, box rhs) => {
                     test_integer(expected_lhs, lhs);
                     test_integer(expected_rhs, rhs);
                     assert_eq!(op.as_str(),
@@ -699,22 +711,29 @@ mod tests {
     #[test]
     fn test_infix_precedence() {
         let input = "1 + 2 :: 3";
-        fn make_expr(i: i64) -> Expr {
-            Expr::Literal(Pos::dummy(), Literal::Int(i))
-        }
-        let p = Pos::dummy();
-        let expected = Expr::Infix(p,
-                                   box Expr::Infix(p,
-                                                   box make_expr(1),
-                                                   Symbol::intern("+"),
-                                                   box make_expr(2)),
-                                   Symbol::intern("::"),
-                                   box make_expr(3));
         let file = File::new(None, input.len());
         let mut parser = Parser::new(file, input);
         let e = parser.parse_expr();
         test_parse_error(&parser);
-        assert_eq!(e, expected);
+        let (left, right) = match e.node {
+            ExprKind::Infix(box left, op, box right) => {
+                assert_eq!(op.as_str(), "::");
+                (left, right)
+            }
+            _ => panic!("expression is not an infix expression: got = {:?}", e.node),
+        };
+        test_integer(3, right);
+        match left.node {
+            ExprKind::Infix(box left, op, box right) => {
+                assert_eq!(op.as_str(), "+");
+                test_integer(1, left);
+                test_integer(2, right);
+            }
+            _ => {
+                panic!("left expression is not an infix expression: got = {:?}",
+                       left.node)
+            }
+        }
     }
 
     #[test]
@@ -725,8 +744,8 @@ mod tests {
             let mut parser = Parser::new(file, &input);
             let e = parser.parse_expr();
             test_parse_error(&parser);
-            match e {
-                Expr::Paren(_, _) => (),
+            match e.node {
+                ExprKind::Paren(_) => (),
                 _ => assert!(false, "test[#{}]: input = {}, got = {:?}", i, input, e),
             }
         }
@@ -744,8 +763,8 @@ mod tests {
             let mut parser = Parser::new(file, &input);
             let e = parser.parse_expr();
             test_parse_error(&parser);
-            match e {
-                Expr::Call(_, f, args) => {
+            match e.node {
+                ExprKind::Call(f, args) => {
                     test_identifier("f", *f);
                     for (arg, expected) in args.into_iter().zip(n.into_iter()) {
                         test_integer(expected, arg);
@@ -782,15 +801,15 @@ mod tests {
     }
 
     fn test_identifier(expected: &str, e: Expr) {
-        match e {
-            Expr::Ident(_, name) => assert_eq!(name.as_str(), expected),
+        match e.node {
+            ExprKind::Ident(name) => assert_eq!(name.as_str(), expected),
             _ => assert!(false, "expression is not an identifier: got {:?}", e),
         }
     }
 
     fn test_integer(expected: i64, e: Expr) {
-        match e {
-            Expr::Literal(_, Literal::Int(i)) => assert_eq!(i, expected),
+        match e.node {
+            ExprKind::Literal(Literal::Int(i)) => assert_eq!(i, expected),
             _ => assert!(false, "expression is not an integer literal: got {:?}", e),
         }
     }

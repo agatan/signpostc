@@ -62,17 +62,17 @@ pub trait Visitor {
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> VisitState<Self::Error> {
-        match *expr {
-            Expr::Error |
-            Expr::Literal(_, _) |
-            Expr::Ident(_, _) => VisitState::Run,
-            Expr::Prefix(_, _, ref e) => self.visit_expr(e),
-            Expr::Infix(_, ref lhs, _, ref rhs) => {
+        match expr.node {
+            ExprKind::Error |
+            ExprKind::Literal(_) |
+            ExprKind::Ident(_) => VisitState::Run,
+            ExprKind::Prefix(_, ref e) => self.visit_expr(e),
+            ExprKind::Infix(ref lhs, _, ref rhs) => {
                 visit!(self.visit_expr(lhs));
                 self.visit_expr(rhs)
             }
-            Expr::Paren(_, ref e) => self.visit_expr(e),
-            Expr::Call(_, ref f, ref args) => {
+            ExprKind::Paren(ref e) => self.visit_expr(e),
+            ExprKind::Call(ref f, ref args) => {
                 visit!(self.visit_expr(f));
                 for arg in args {
                     visit!(self.visit_expr(arg));
@@ -223,9 +223,9 @@ impl<T: Write> Visitor for Dumper<T> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> VisitState<Self::Error> {
-        match *expr {
-            Expr::Error => __try_dump!(self, "error:"),
-            Expr::Literal(_, ref lit) => {
+        match expr.node {
+            ExprKind::Error => __try_dump!(self, "error:"),
+            ExprKind::Literal(ref lit) => {
                 match *lit {
                     Literal::Unit => __try_dump!(self, "unit:"),
                     Literal::Int(i) => __try_dump!(self, "int: {}", i),
@@ -233,10 +233,10 @@ impl<T: Write> Visitor for Dumper<T> {
                     Literal::String(s) => __try_dump!(self, "string: {}", s.as_str()),
                 }
             }
-            Expr::Ident(_, ref name) => {
+            ExprKind::Ident(ref name) => {
                 __try_dump!(self, "ident: {}", name.as_str());
             }
-            Expr::Prefix(_, op, ref e) => {
+            ExprKind::Prefix(op, ref e) => {
                 __try_dump!(self, "prefix op:");
                 {
                     let mut w = self.enter();
@@ -244,7 +244,7 @@ impl<T: Write> Visitor for Dumper<T> {
                     visit!(w.visit_expr(e));
                 }
             }
-            Expr::Infix(_, ref lhs, op, ref rhs) => {
+            ExprKind::Infix(ref lhs, op, ref rhs) => {
                 __try_dump!(self, "infix op:");
                 {
                     let mut w = self.enter();
@@ -253,10 +253,10 @@ impl<T: Write> Visitor for Dumper<T> {
                     visit!(w.visit_expr(rhs));
                 }
             }
-            Expr::Paren(_, ref e) => {
+            ExprKind::Paren(ref e) => {
                 visit!(self.visit_expr(e));
             }
-            Expr::Call(_, ref f, ref args) => {
+            ExprKind::Call(ref f, ref args) => {
                 __try_dump!(self, "call:");
                 {
                     let mut w = self.enter();

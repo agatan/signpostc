@@ -5,6 +5,30 @@ mod visitor;
 
 pub use self::visitor::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NodeId(u32);
+
+impl NodeId {
+    pub fn new(x: usize) -> NodeId {
+        assert!(x < (::std::u32::MAX as usize));
+        NodeId(x as u32)
+    }
+
+    pub fn from_u32(x: u32) -> NodeId {
+        NodeId(x)
+    }
+
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+pub const DUMMY_NODE_ID: NodeId = NodeId(!0);
+
 #[derive(Debug, Clone)]
 pub struct Program {
     pub decls: Vec<Decl>,
@@ -67,28 +91,39 @@ pub enum Literal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Error,
-    Literal(Pos, Literal),
-    Ident(Pos, Symbol),
-    Prefix(Pos, Symbol, Box<Expr>),
-    Infix(Pos, Box<Expr>, Symbol, Box<Expr>),
-    Paren(Pos, Box<Expr>),
-    Call(Pos, Box<Expr>, Vec<Expr>),
+pub struct Expr {
+    pub id: NodeId,
+    pub node: ExprKind,
+    pub pos: Pos,
 }
 
 impl Expr {
-    pub fn pos(&self) -> Pos {
-        match *self {
-            Expr::Error => Pos::dummy(),
-            Expr::Literal(p, _) |
-            Expr::Ident(p, _) |
-            Expr::Prefix(p, _, _) |
-            Expr::Infix(p, _, _, _) |
-            Expr::Paren(p, _) |
-            Expr::Call(p, _, _) => p,
+    pub fn error() -> Expr {
+        Expr {
+            id: DUMMY_NODE_ID,
+            node: ExprKind::Error,
+            pos: Pos::dummy(),
         }
     }
+
+    pub fn new(id: NodeId, pos: Pos, node: ExprKind) -> Expr {
+        Expr {
+            id: id,
+            node: node,
+            pos: pos,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprKind {
+    Error,
+    Literal(Literal),
+    Ident(Symbol),
+    Prefix(Symbol, Box<Expr>),
+    Infix(Box<Expr>, Symbol, Box<Expr>),
+    Paren(Box<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
