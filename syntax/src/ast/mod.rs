@@ -43,11 +43,11 @@ pub enum Decl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
     pub name: Symbol,
-    pub ty: Type,
+    pub ty: Ty,
 }
 
 impl Param {
-    pub fn new(name: Symbol, ty: Type) -> Self {
+    pub fn new(name: Symbol, ty: Ty) -> Self {
         Param {
             name: name,
             ty: ty,
@@ -60,7 +60,7 @@ pub struct FunDecl {
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
     pub params: Vec<Param>,
-    pub ret: Type,
+    pub ret: Option<Ty>,
     // TODO(agatan): body should be `Vec<Stmt>`
     pub body: Expr,
 }
@@ -69,14 +69,14 @@ impl FunDecl {
     pub fn new(name: Symbol,
                type_params: Vec<Symbol>,
                params: Vec<Param>,
-               ret: Option<Type>,
+               ret: Option<Ty>,
                body: Expr)
                -> Self {
         FunDecl {
             name: name,
             type_params: type_params,
             params: params,
-            ret: ret.unwrap_or(Type::Builtin(BuiltinType::Unit)),
+            ret: ret,
             body: body,
         }
     }
@@ -127,7 +127,7 @@ pub enum ExprKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuiltinType {
+pub enum BuiltinTy {
     Unit,
     Int,
     Bool,
@@ -135,44 +135,31 @@ pub enum BuiltinType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type {
+pub struct Ty {
+    pub id: NodeId,
+    pub node: TyKind,
+    pub pos: Pos,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TyKind {
     /// Represents error state for syntax checking.
     Error,
     /// Should be infered later.
     Hole,
-    /// Builtin types
-    Builtin(BuiltinType),
-    /// Mutable reference type
-    Ref,
     /// User defined type
     Ident(Symbol),
-    /// Type application. e.g, `Ref<Int>`
-    App(Box<Type>, Vec<Type>),
+    /// Ty application. e.g, `Ref<Int>`
+    App(Symbol, Vec<Ty>),
 }
 
-impl Type {
-    pub fn from_symbol(sym: Symbol) -> Type {
-        let s = sym.as_str();
-        match &*s {
-            "Unit" => Type::Builtin(BuiltinType::Unit),
-            "Int" => Type::Builtin(BuiltinType::Int),
-            "Bool" => Type::Builtin(BuiltinType::Bool),
-            "String" => Type::Builtin(BuiltinType::String),
-            "Ref" => Type::Ref,
-            _ => Type::Ident(sym),
+impl Ty {
+    pub fn error() -> Ty {
+        Ty {
+            id: DUMMY_NODE_ID,
+            node: TyKind::Error,
+            pos: DUMMY_POS,
         }
-    }
-
-    pub fn error() -> Type {
-        Type::Error
-    }
-
-    pub fn hole() -> Type {
-        Type::Hole
-    }
-
-    pub fn app(base: Type, args: Vec<Type>) -> Type {
-        Type::App(box base, args)
     }
 }
 

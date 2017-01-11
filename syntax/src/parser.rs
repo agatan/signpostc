@@ -7,7 +7,7 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{NodeId, Program, Decl, Param, FunDecl, Type, Expr, ExprKind, Literal};
+use ast::{NodeId, Program, Decl, Param, FunDecl, Ty, TyKind, Expr, ExprKind, Literal};
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -397,22 +397,22 @@ impl<'a> Parser<'a> {
         Ok(Expr::new(self.next_id(), pos, ExprKind::Call(box f, args)))
     }
 
-    pub fn parse_type(&mut self) -> Type {
+    pub fn parse_type(&mut self) -> Ty {
         let ty = self.parse_type_();
         match ty {
             Ok(t) => t,
             Err(e) => {
                 self.annotate_error(e);
-                Type::Error
+                Ty::error()
             }
         }
     }
 
-    fn parse_type_(&mut self) -> Result<Type, Error> {
+    fn parse_type_(&mut self) -> Result<Ty, Error> {
         self.expect_without_newline(TokenKind::Uident)?;
+        let pos = self.current_token.pos();
         let base_sym = self.current_token.symbol();
-        let mut ty = Type::from_symbol(base_sym);
-        if self.expect_without_newline(TokenKind::Langle).is_ok() {
+        let node = if self.expect(TokenKind::Langle).is_ok() {
             let mut args = Vec::new();
             loop {
                 let ty = self.parse_type_()?;
@@ -425,9 +425,15 @@ impl<'a> Parser<'a> {
                     break;
                 }
             }
-            ty = Type::app(ty, args);
-        }
-        Ok(ty)
+            TyKind::App(base_sym, args)
+        } else {
+            TyKind::Ident(base_sym)
+        };
+        Ok(Ty {
+            id: self.next_id(),
+            node: node,
+            pos: pos,
+        })
     }
 }
 
@@ -775,22 +781,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_type() {
-        let tests = vec![("Int", Type::Builtin(BuiltinType::Int)),
-                         ("Unit", Type::Builtin(BuiltinType::Unit)),
-                         ("Bool", Type::Builtin(BuiltinType::Bool)),
-                         ("Ref", Type::Ref),
-                         ("T", Type::Ident(Symbol::intern("T"))),
-                         ("Ref<T>",
-                          Type::App(box Type::Ref, vec![Type::Ident(Symbol::intern("T"))]))];
+    fn test_parse_app_type() {
+        let input = "Ref<T>";
 
-        for (i, (input, expected_ty)) in tests.into_iter().enumerate() {
-            let file = File::new(None, input.len());
-            let mut parser = Parser::new(file, &input);
-            let ty = parser.parse_type();
-            test_parse_error(&parser);
-            assert_eq!(ty, expected_ty, "test[#{}]: input = {}", i, input);
-
+        let file = File::new(None, input.len());
+        let mut parser = Parser::new(file, &input);
+        let ty = parser.parse_type();
+        test_parse_error(&parser);
+        match ty.node {
+            TyKind::App(base, args) => {
+                assert_eq!(base.as_str(), "Ref");
+                assert!(args.len() == 1);
+                match args[0].node {
+                    TyKind::Ident(sym) => assert_eq!(sym.as_str(), "T"),
+                    _ => panic!("App's argument is not Ident(T), got = {:?}", args[0]),
+                }
+            }
+            _ => panic!("ty is not an App, got = {:?}", ty.node),
         }
     }
 

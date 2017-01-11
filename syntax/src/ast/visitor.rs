@@ -54,7 +54,9 @@ pub trait Visitor {
                 for param in params {
                     visit!(self.visit_ty(&param.ty));
                 }
-                visit!(self.visit_ty(ret));
+                if let Some(ref ret) = *ret {
+                    visit!(self.visit_ty(ret));
+                }
                 visit!(self.visit_expr(body));
                 VisitState::Run
             }
@@ -82,13 +84,12 @@ pub trait Visitor {
         }
     }
 
-    fn visit_ty(&mut self, ty: &Type) -> VisitState<Self::Error> {
-        match *ty {
-            Type::Error | Type::Hole | Type::Builtin(_) | Type::Ref | Type::Ident(_) => {
+    fn visit_ty(&mut self, ty: &Ty) -> VisitState<Self::Error> {
+        match ty.node {
+            TyKind::Error | TyKind::Hole | TyKind::Ident(_) => {
                 VisitState::Run
             }
-            Type::App(ref base, ref args) => {
-                visit!(self.visit_ty(base));
+            TyKind::App(_, ref args) => {
                 for arg in args {
                     visit!(self.visit_ty(arg));
                 }
@@ -207,10 +208,15 @@ impl<T: Write> Visitor for Dumper<T> {
                         visit!(w.dump_param(param));
                     }
                 }
-                __try_dump!(w, "return:");
-                {
-                    let mut w = w.enter();
-                    visit!(w.visit_ty(&f.ret));
+                match f.ret {
+                    Some(ref ty) => {
+                        __try_dump!(w, "return:");
+                        {
+                            let mut w = w.enter();
+                            visit!(w.visit_ty(ty));
+                        }
+                    },
+                    None => __try_dump!(w, "return: (default)"),
                 }
                 __try_dump!(w, "body:");
                 {
@@ -278,29 +284,16 @@ impl<T: Write> Visitor for Dumper<T> {
         VisitState::Run
     }
 
-    fn visit_ty(&mut self, ty: &Type) -> VisitState<Self::Error> {
-        match *ty {
-            Type::Error => __try_dump!(self, "error:"),
-            Type::Hole => __try_dump!(self, "_"),
-            Type::Builtin(ty) => {
-                match ty {
-                    BuiltinType::Unit => __try_dump!(self, "Unit"),
-                    BuiltinType::Int => __try_dump!(self, "Int"),
-                    BuiltinType::Bool => __try_dump!(self, "Bool"),
-                    BuiltinType::String => __try_dump!(self, "String"),
-                }
-            }
-            Type::Ref => __try_dump!(self, "Ref"),
-            Type::Ident(ref name) => __try_dump!(self, "Ident: {}", name.as_str()),
-            Type::App(ref base, ref args) => {
+    fn visit_ty(&mut self, ty: &Ty) -> VisitState<Self::Error> {
+        match ty.node {
+            TyKind::Error => __try_dump!(self, "error:"),
+            TyKind::Hole => __try_dump!(self, "_"),
+            TyKind::Ident(ref name) => __try_dump!(self, "Ident: {}", name.as_str()),
+            TyKind::App(base, ref args) => {
                 __try_dump!(self, "App:");
                 {
                     let mut w = self.enter();
-                    __try_dump!(w, "base:");
-                    {
-                        let mut w = w.enter();
-                        visit!(w.visit_ty(base));
-                    }
+                    __try_dump!(w, "base: {}", base.as_str());
                     __try_dump!(w, "args:");
                     {
                         let mut w = w.enter();
