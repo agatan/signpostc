@@ -1,6 +1,6 @@
 use std::fmt;
 
-use position::Pos;
+use position::{DUMMY_POS, Pos};
 use symbol::Symbol;
 
 /// represents tokens of source code.
@@ -14,7 +14,7 @@ pub struct Token {
 impl Token {
     pub fn dummy() -> Self {
         Token {
-            pos: Pos::dummy(),
+            pos: DUMMY_POS,
             kind: TokenKind::Error,
             symbol: Symbol::intern(""),
         }

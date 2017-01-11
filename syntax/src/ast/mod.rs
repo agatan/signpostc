@@ -1,4 +1,4 @@
-use position::Pos;
+use position::{DUMMY_POS, Pos};
 use symbol::Symbol;
 
 mod visitor;
@@ -102,7 +102,7 @@ impl Expr {
         Expr {
             id: DUMMY_NODE_ID,
             node: ExprKind::Error,
-            pos: Pos::dummy(),
+            pos: DUMMY_POS,
         }
     }
 

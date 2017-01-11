@@ -69,14 +69,12 @@ impl PartialEq for Pos {
 }
 
 impl Pos {
-    pub fn dummy() -> Self {
-        Pos(None)
-    }
-
     pub fn is_valid(&self) -> bool {
         self.0.is_some()
     }
 }
+
+pub const DUMMY_POS: Pos = Pos(None);
 
 /// `File` represents a source file.
 #[derive(Debug, Clone)]
