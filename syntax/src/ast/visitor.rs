@@ -86,9 +86,7 @@ pub trait Visitor {
 
     fn visit_ty(&mut self, ty: &Ty) -> VisitState<Self::Error> {
         match ty.node {
-            TyKind::Error | TyKind::Hole | TyKind::Ident(_) => {
-                VisitState::Run
-            }
+            TyKind::Error | TyKind::Hole | TyKind::Ident(_) => VisitState::Run,
             TyKind::App(_, ref args) => {
                 for arg in args {
                     visit!(self.visit_ty(arg));
@@ -117,27 +115,6 @@ macro_rules! __try_dump {
     }
 }
 
-struct Indent<'a, T: 'a>(&'a mut Dumper<T>);
-
-impl<'a, T> ::std::ops::Drop for Indent<'a, T> {
-    fn drop(&mut self) {
-        self.0.exit();
-    }
-}
-
-impl<'a, T> ::std::ops::Deref for Indent<'a, T> {
-    type Target = Dumper<T>;
-    fn deref(&self) -> &Dumper<T> {
-        self.0
-    }
-}
-
-impl<'a, T> ::std::ops::DerefMut for Indent<'a, T> {
-    fn deref_mut(&mut self) -> &mut Dumper<T> {
-        self.0
-    }
-}
-
 impl<T> Dumper<T> {
     pub fn new(w: T) -> Self {
         Dumper {
@@ -147,13 +124,21 @@ impl<T> Dumper<T> {
         }
     }
 
-    fn enter<'a>(&'a mut self) -> Indent<'a, T> {
+    fn enter<'a>(&'a mut self) {
         self.depth += 1;
-        Indent(self)
     }
 
     fn exit(&mut self) {
         self.depth -= 1;
+    }
+
+    pub fn with_indent<V, F>(&mut self, f: F) -> V
+        where F: FnOnce(&mut Self) -> V
+    {
+        self.enter();
+        let t = f(self);
+        self.exit();
+        t
     }
 }
 
@@ -168,16 +153,11 @@ impl<T: Write> Dumper<T> {
 
     fn dump_param(&mut self, param: &Param) -> VisitState<io::Error> {
         __try_dump!(self, "param:");
-        {
-            let mut w = self.enter();
-            __try_dump!(w, "name: {}", param.name.as_str());
-            __try_dump!(w, "type:");
-            {
-                let mut w = w.enter();
-                visit!(w.visit_ty(&param.ty));
-            }
-        }
-        VisitState::Run
+        self.with_indent(|this| {
+            __try_dump!(this, "name: {}", param.name.as_str());
+            __try_dump!(this, "type:");
+            this.with_indent(|this| this.visit_ty(&param.ty))
+        })
     }
 }
 
@@ -192,38 +172,36 @@ impl<T: Write> Visitor for Dumper<T> {
             }
             Decl::Def(_, ref f) => {
                 __try_dump!(self, "def:");
-                let mut w = self.enter();
-                __try_dump!(w, "name: {}", f.name.as_str());
-                __try_dump!(w, "type_params:");
-                {
-                    let mut w = w.enter();
-                    for ty in f.type_params.iter() {
-                        __try_dump!(w, "PARAM: {}", ty.as_str());
-                    }
-                }
-                __try_dump!(w, "params:");
-                {
-                    let mut w = w.enter();
-                    for param in f.params.iter() {
-                        visit!(w.dump_param(param));
-                    }
-                }
-                match f.ret {
-                    Some(ref ty) => {
-                        __try_dump!(w, "return:");
-                        {
-                            let mut w = w.enter();
-                            visit!(w.visit_ty(ty));
+                self.with_indent(|this| {
+                    __try_dump!(this, "name: {}", f.name.as_str());
+                    __try_dump!(this, "type_params:");
+                    this.with_indent(|this| {
+                        for ty in f.type_params.iter() {
+                            __try_dump!(this, "PARAM: {}", ty.as_str());
                         }
-                    },
-                    None => __try_dump!(w, "return: (default)"),
-                }
-                __try_dump!(w, "body:");
-                {
-                    let mut w = w.enter();
-                    visit!(w.visit_expr(&f.body));
-                }
-                VisitState::Run
+                        VisitState::Run
+                    });
+                    __try_dump!(this, "params:");
+                    this.with_indent(|this| {
+                        for param in f.params.iter() {
+                            visit!(this.dump_param(param));
+                        }
+                        VisitState::Run
+                    });
+                    match f.ret {
+                        Some(ref ty) => {
+                            __try_dump!(this, "return:");
+                            this.with_indent(|this| {
+                                this.visit_ty(ty)
+                            });
+                        }
+                        None => __try_dump!(this, "return: (default)"),
+                    }
+                    __try_dump!(this, "body:");
+                    this.with_indent(|this| {
+                        this.visit_expr(&f.body)
+                    })
+                })
             }
         }
     }
@@ -244,41 +222,39 @@ impl<T: Write> Visitor for Dumper<T> {
             }
             ExprKind::Prefix(op, ref e) => {
                 __try_dump!(self, "prefix op:");
-                {
-                    let mut w = self.enter();
-                    __try_dump!(w, "op: {}", op.as_str());
-                    visit!(w.visit_expr(e));
-                }
+                self.with_indent(|this| {
+                    __try_dump!(this, "op: {}", op.as_str());
+                    this.visit_expr(e)
+                });
             }
             ExprKind::Infix(ref lhs, op, ref rhs) => {
                 __try_dump!(self, "infix op:");
-                {
-                    let mut w = self.enter();
-                    __try_dump!(w, "op: {}", op.as_str());
-                    visit!(w.visit_expr(lhs));
-                    visit!(w.visit_expr(rhs));
-                }
+                self.with_indent(|this| {
+                    __try_dump!(this, "op: {}", op.as_str());
+                    visit!(this.visit_expr(lhs));
+                    visit!(this.visit_expr(rhs));
+                    VisitState::Run
+                });
             }
             ExprKind::Paren(ref e) => {
                 visit!(self.visit_expr(e));
             }
             ExprKind::Call(ref f, ref args) => {
                 __try_dump!(self, "call:");
-                {
-                    let mut w = self.enter();
-                    __try_dump!(w, "function:");
-                    {
-                        let mut w = w.enter();
-                        visit!(w.visit_expr(f));
-                    }
-                    __try_dump!(w, "arguments:");
-                    {
-                        let mut w = w.enter();
+                self.with_indent(|this| {
+                    __try_dump!(this, "function:");
+                    this.with_indent(|this| {
+                        this.visit_expr(f)
+                    });
+                    __try_dump!(this, "arguments:");
+                    this.with_indent(|this| {
                         for arg in args {
-                            visit!(w.visit_expr(arg));
+                            visit!(this.visit_expr(arg));
                         }
-                    }
-                }
+                        VisitState::Run
+                    });
+                    VisitState::Run
+                });
             }
         }
         VisitState::Run
@@ -288,20 +264,20 @@ impl<T: Write> Visitor for Dumper<T> {
         match ty.node {
             TyKind::Error => __try_dump!(self, "error:"),
             TyKind::Hole => __try_dump!(self, "_"),
-            TyKind::Ident(ref name) => __try_dump!(self, "Ident: {}", name.as_str()),
+            TyKind::Ident(ref name) => __try_dump!(self, "ident: {}", name.as_str()),
             TyKind::App(base, ref args) => {
-                __try_dump!(self, "App:");
-                {
-                    let mut w = self.enter();
-                    __try_dump!(w, "base: {}", base.as_str());
-                    __try_dump!(w, "args:");
-                    {
-                        let mut w = w.enter();
+                __try_dump!(self, "app:");
+                self.with_indent(|this| {
+                    __try_dump!(this, "base: {}", base.as_str());
+                    __try_dump!(this, "args:");
+                    this.with_indent(|this| {
                         for arg in args {
-                            visit!(w.visit_ty(arg));
+                            visit!(this.visit_ty(arg));
                         }
-                    }
-                }
+                        VisitState::Run
+                    });
+                    VisitState::Run
+                });
             }
         }
         VisitState::Run
