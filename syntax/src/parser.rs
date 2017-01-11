@@ -621,7 +621,7 @@ mod tests {
                 ExprKind::Literal(actual) => {
                     assert_eq!(actual, expected, "test[#{}]: input = {:?}", i, input)
                 }
-                _ => assert!(false, "test[#{}]: input = {:?}, got = {:?}", i, input, e),
+                _ => panic!("test[#{}]: input = {:?}, got = {:?}", i, input, e),
             }
         }
     }
@@ -665,7 +665,7 @@ mod tests {
                            input,
                            lit);
             } else {
-                assert!(false, "test[#{}]: input = {:?}, got = {:?}", i, input, e)
+                panic!("test[#{}]: input = {:?}, got = {:?}", i, input, e)
             }
         }
     }
@@ -699,10 +699,9 @@ mod tests {
                                op);
                 }
                 _ => {
-                    assert!(false,
-                            "test[#{}]: expression is not an infix expression. got = {:?}",
-                            i,
-                            e);
+                    panic!("test[#{}]: expression is not an infix expression. got = {:?}",
+                           i,
+                           e);
                 }
             }
         }
@@ -746,7 +745,7 @@ mod tests {
             test_parse_error(&parser);
             match e.node {
                 ExprKind::Paren(_) => (),
-                _ => assert!(false, "test[#{}]: input = {}, got = {:?}", i, input, e),
+                _ => panic!("test[#{}]: input = {}, got = {:?}", i, input, e),
             }
         }
     }
@@ -770,12 +769,7 @@ mod tests {
                         test_integer(expected, arg);
                     }
                 }
-                _ => {
-                    assert!(false,
-                            "test[#{}]: expression is not a call: got = {:?}",
-                            i,
-                            e)
-                }
+                _ => panic!("test[#{}]: expression is not a call: got = {:?}", i, e),
             }
         }
     }
@@ -803,14 +797,14 @@ mod tests {
     fn test_identifier(expected: &str, e: Expr) {
         match e.node {
             ExprKind::Ident(name) => assert_eq!(name.as_str(), expected),
-            _ => assert!(false, "expression is not an identifier: got {:?}", e),
+            _ => panic!("expression is not an identifier: got {:?}", e),
         }
     }
 
     fn test_integer(expected: i64, e: Expr) {
         match e.node {
             ExprKind::Literal(Literal::Int(i)) => assert_eq!(i, expected),
-            _ => assert!(false, "expression is not an integer literal: got {:?}", e),
+            _ => panic!("expression is not an integer literal: got {:?}", e),
         }
     }
 
