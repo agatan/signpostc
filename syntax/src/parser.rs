@@ -316,6 +316,7 @@ impl<'a> Parser<'a> {
         self.expect_without_newline(TokenKind::Lparen)?;
         let pos = self.current_token.pos();
         let e = self.parse_expr_(Assoc::lowest())?;
+        self.expect_without_newline(TokenKind::Rparen)?;
         Ok(Expr::new(self.next_id(), pos, ExprKind::Paren(box e)))
     }
 
@@ -778,6 +779,23 @@ mod tests {
             match e.node {
                 ExprKind::Paren(_) => (),
                 _ => panic!("test[#{}]: input = {}, got = {:?}", i, input, e),
+            }
+        }
+
+        {
+            let input = "(1 - 2) * 3";
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            test_parse_error(&parser);
+            if let ExprKind::Infix(box left, _, _) = e.node {
+                if let ExprKind::Paren(_) = left.node {
+                    // ok
+                } else {
+                    panic!("left is not a paren expression, got = {:?}", left.node);
+                }
+            } else {
+                panic!("e is not an infix expression, got = {:?}", e.node);
             }
         }
     }
