@@ -679,6 +679,29 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_struct() {
+        let input = r#"
+        struct Pair<T, U> {
+            first: T,
+            second: U,
+        }
+        "#;
+        let d = super::super::parse_decl(input).unwrap();
+        if let DeclKind::Struct(ref st) = d.node {
+            assert_eq!(st.name.as_str(), "Pair");
+            assert_eq!(st.type_params.len(), 2);
+            for (act, exp) in st.type_params.iter().zip(vec!["T", "U"].into_iter()) {
+                assert_eq!(act.as_str(), exp);
+            }
+            for (act, exp) in st.fields.iter().zip(vec!["first", "second"].into_iter()) {
+                assert_eq!(act.name.as_str(), exp);
+            }
+        } else {
+            panic!("d is not a struct declaration, got = {:?}", d.node);
+        }
+    }
+
+    #[test]
     fn test_parse_stmt() {
         let expected_expr = Expr::new(NodeId::new(1),
                                       DUMMY_POS,

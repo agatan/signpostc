@@ -31,3 +31,15 @@ pub fn parse_expr(src: &str) -> Result<ast::Expr, errors::ErrorList> {
         Ok(expr)
     }
 }
+
+pub fn parse_decl(src: &str) -> Result<ast::Decl, errors::ErrorList> {
+    let file = position::File::new(None, src.len());
+    let mut parser = parser::Parser::new(file, src);
+    let decl = parser.parse_decl();
+    let errors = parser.into_errors();
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(decl)
+    }
+}
