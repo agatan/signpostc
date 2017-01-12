@@ -7,8 +7,8 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{NodeId, Program, Decl, Param, FunDecl, Ty, TyKind, Stmt, StmtKind, Expr, ExprKind,
-          Literal};
+use ast::{NodeId, Program, Decl, DeclKind, Param, FunDecl, Ty, TyKind, Stmt, StmtKind, Expr,
+          ExprKind, Literal};
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -183,8 +183,9 @@ impl<'a> Parser<'a> {
             Ok(d) => d,
             Err(e) => {
                 self.annotate_error(e);
+                let pos = self.next_token.pos();
                 self.sync_decl();
-                Decl::Error
+                Decl::new(self.next_id(), pos, DeclKind::Error)
             }
         }
     }
@@ -205,7 +206,9 @@ impl<'a> Parser<'a> {
         let body = self.parse_expr();
         self.succ_token();
 
-        Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, ret_ty, body)))
+        Ok(Decl::new(self.next_id(),
+                     pos,
+                     DeclKind::Def(FunDecl::new(name, type_params, params, ret_ty, body))))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {
@@ -612,9 +615,9 @@ mod tests {
                    program.decls);
         test_parse_error(&parser);
         let ref decl = program.decls[0];
-        let fun_decl = match *decl {
-            Decl::Def(_, ref f) => f,
-            _ => panic!(format!("expected Decl::Def, got {:?}", decl)),
+        let fun_decl = match decl.node {
+            DeclKind::Def(ref f) => f,
+            _ => panic!(format!("expected DeclKind::Def, got {:?}", decl)),
         };
         assert_eq!(fun_decl.name.as_str(), "f");
         assert_eq!(fun_decl.params.len(), 1);
@@ -637,9 +640,9 @@ mod tests {
                        "decls size is not 1: {:?}",
                        program.decls);
             let ref decl = program.decls[0];
-            let fun_decl = match *decl {
-                Decl::Def(_, ref f) => f,
-                _ => panic!(format!("expected Decl::Def, got {:?}", decl)),
+            let fun_decl = match decl.node {
+                DeclKind::Def(ref f) => f,
+                _ => panic!(format!("expected DeclKind::Def, got {:?}", decl)),
             };
             assert_eq!(fun_decl.name.as_str(), "f");
             assert_eq!(fun_decl.params.len(), len);
@@ -664,9 +667,9 @@ mod tests {
                        "decls size is not 1: {:?}",
                        program.decls);
             let ref decl = program.decls[0];
-            let fun_decl = match *decl {
-                Decl::Def(_, ref f) => f,
-                _ => panic!(format!("test[#{}]: expected Decl::Def, got {:?}", i, decl)),
+            let fun_decl = match decl.node {
+                DeclKind::Def(ref f) => f,
+                _ => panic!(format!("test[#{}]: expected DeclKind::Def, got {:?}", i, decl)),
             };
             assert_eq!(fun_decl.type_params.len(), len);
             for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {

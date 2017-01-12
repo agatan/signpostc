@@ -86,9 +86,9 @@ pub trait Visitor {
     }
 
     fn visit_decl(&mut self, decl: &Decl) -> VisitState<Self::Error> {
-        match *decl {
-            Decl::Error => VisitState::Run,
-            Decl::Def(_, FunDecl { ref params, ref ret, ref body, .. }) => {
+        match decl.node {
+            DeclKind::Error => VisitState::Run,
+            DeclKind::Def(FunDecl { ref params, ref ret, ref body, .. }) => {
                 for param in params {
                     visit!(self.visit_ty(&param.ty));
                 }
@@ -223,12 +223,12 @@ impl<T: Write> Visitor for Dumper<T> {
     type Error = io::Error;
 
     fn visit_decl(&mut self, decl: &Decl) -> VisitState<Self::Error> {
-        match *decl {
-            Decl::Error => {
+        match decl.node {
+            DeclKind::Error => {
                 __try_dump!(self, "error:");
                 VisitState::Run
             }
-            Decl::Def(_, ref f) => {
+            DeclKind::Def(ref f) => {
                 __try_dump!(self, "def:");
                 self.with_indent(|this| {
                     __try_dump!(this, "name: {}", f.name.as_str());

@@ -35,9 +35,26 @@ pub struct Program {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Decl {
+pub struct Decl {
+    pub id: NodeId,
+    pub node: DeclKind,
+    pub pos: Pos,
+}
+
+impl Decl {
+    pub fn new(id: NodeId, pos: Pos, node: DeclKind) -> Decl {
+        Decl {
+            id: id,
+            node: node,
+            pos: pos,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeclKind {
     Error,
-    Def(Pos, FunDecl),
+    Def(FunDecl),
 }
 
 #[derive(Debug, Clone, PartialEq)]
