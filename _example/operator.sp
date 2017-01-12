@@ -1,3 +1,3 @@
-def f(x: Int, y: Int): Int {
+def f(x: Int, y: Int): Int = {
     x + y
 }

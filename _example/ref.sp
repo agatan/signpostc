@@ -1,3 +1,3 @@
-def wrap(x: Int): Ref<Int> {
+def wrap(x: Int): Ref<Int> = {
     ref(x)
 }

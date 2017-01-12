@@ -55,6 +55,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
         parser.register_prefix(TokenKind::Operator, Self::parse_prefix_expr);
         parser.register_prefix(TokenKind::Lparen, Self::parse_paren_expr);
+        parser.register_prefix(TokenKind::Lbrace, Self::parse_block_expr);
 
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
@@ -200,9 +201,8 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        self.expect_without_newline(TokenKind::Lbrace)?;
+        self.expect_without_newline(TokenKind::Eq)?;
         let body = self.parse_expr();
-        self.expect_without_newline(TokenKind::Rbrace)?;
         self.succ_token();
 
         Ok(Decl::Def(pos, FunDecl::new(name, type_params, params, ret_ty, body)))
@@ -271,12 +271,16 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_stmt(&mut self) -> Stmt {
+        // always in block expressions
         // TODO(agatan): currently, Stmt only consists of Expr.
         let e = self.parse_expr();
         let pos = e.pos;
         let node = if self.expect(TokenKind::Semicolon).is_ok() {
             StmtKind::Semi(e)
         } else if self.expect(TokenKind::Newline).is_ok() {
+            StmtKind::Expr(e)
+        } else if self.next_is(TokenKind::Rbrace) {
+            // `{ 1 }` style block
             StmtKind::Expr(e)
         } else {
             let err = self.make_error(self.next_token,
@@ -385,6 +389,21 @@ impl<'a> Parser<'a> {
                 prec: Prec::Prefix,
             })?;
         Ok(Expr::new(self.next_id(), pos, ExprKind::Prefix(op, box expr)))
+    }
+
+    fn parse_block_expr(&mut self) -> Result<Expr, Error> {
+        self.expect(TokenKind::Lbrace)?;
+        let pos = self.current_token.pos();
+        let mut stmts = Vec::new();
+        while self.expect_without_newline(TokenKind::Rbrace).is_err() {
+            let stmt = self.parse_stmt();
+            stmts.push(stmt);
+            if self.next_is(TokenKind::EOF) {
+                let err = self.make_error(self.next_token, "expected '}', found 'EOF'".into());
+                return Err(err);
+            }
+        }
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Block(stmts)))
     }
 
     fn parse_infix_expr(&mut self, left: Expr) -> Result<Expr, Error> {
@@ -580,7 +599,7 @@ mod tests {
     #[test]
     fn test_parse_def() {
         let input = r#"
-            def f(x: Int) {
+            def f(x: Int) = {
                 x
             }
         "#;
@@ -608,7 +627,7 @@ mod tests {
                          ("(x: Int)", 1, vec!["x"]),
                          ("(x: Int, y: Bool)", 2, vec!["x", "y"])];
         for (input, len, names) in tests {
-            let input = format!("def f{} {{ 1 }}", input);
+            let input = format!("def f{} = {{ 1 }}", input);
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let program = parser.parse_program();
@@ -635,7 +654,7 @@ mod tests {
     fn test_parse_def_with_typeparams() {
         let tests = vec![("", 0, vec![]), ("<T>", 1, vec!["T"]), ("<T, U>", 2, vec!["T", "U"])];
         for (i, (input, len, names)) in tests.into_iter().enumerate() {
-            let input = format!("def f{}() {{ 1 }}", input);
+            let input = format!("def f{}() = {{ 1 }}", input);
             let file = File::new(None, input.len());
             let mut parser = Parser::new(file, &input);
             let program = parser.parse_program();
@@ -658,7 +677,9 @@ mod tests {
 
     #[test]
     fn test_parse_stmt() {
-        let expected_expr = Expr::new(NodeId::new(1), DUMMY_POS, ExprKind::Literal(Literal::Int(1)));
+        let expected_expr = Expr::new(NodeId::new(1),
+                                      DUMMY_POS,
+                                      ExprKind::Literal(Literal::Int(1)));
         let tests = vec![("1\n", StmtKind::Expr(expected_expr.clone())),
                          ("1;", StmtKind::Semi(expected_expr.clone()))];
         for (input, expected) in tests {
@@ -879,6 +900,46 @@ mod tests {
                 }
             }
             _ => panic!("e is not an UFCS expression, got = {:?}", e.node),
+        }
+    }
+
+    #[test]
+    fn test_parse_block_expr() {
+        let one = ExprKind::Literal(Literal::Int(1));
+        let tests = vec![r#"
+            {
+                1;
+                1
+            }
+            "#,
+
+                         r#" { 1; 1 }"#,
+
+                         r#" {
+            1;
+            1 }"#];
+        for input in tests {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let e = parser.parse_expr();
+            test_parse_error(&parser);
+            if let ExprKind::Block(stmts) = e.node {
+                assert_eq!(stmts.len(), 2);
+                if let StmtKind::Semi(ref first) = stmts[0].node {
+                    assert_eq!(first.node, one);
+                } else {
+                    panic!("first statement is not a semi statement, got = {:?}",
+                           stmts[0].node);
+                }
+                if let StmtKind::Expr(ref second) = stmts[1].node {
+                    assert_eq!(second.node, one);
+                } else {
+                    panic!("second statement is not a semi statement, got = {:?}",
+                           stmts[1].node);
+                }
+            } else {
+                panic!("e is not a block expression, got = {:?}", e);
+            }
         }
     }
 
