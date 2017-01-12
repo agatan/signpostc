@@ -3,6 +3,40 @@ use std::fmt;
 
 use ast::*;
 
+pub trait Visit {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error>;
+}
+
+impl Visit for Program {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error> {
+        visitor.visit_program(self)
+    }
+}
+
+impl Visit for Decl {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error> {
+        visitor.visit_decl(self)
+    }
+}
+
+impl Visit for Stmt {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error> {
+        visitor.visit_stmt(self)
+    }
+}
+
+impl Visit for Expr {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error> {
+        visitor.visit_expr(self)
+    }
+}
+
+impl Visit for Ty {
+    fn accept<T: Visitor + ?Sized>(&self, visitor: &mut T) -> VisitState<T::Error> {
+        visitor.visit_ty(self)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VisitState<E> {
     Run,
@@ -39,6 +73,10 @@ macro_rules! try_visit {
 
 pub trait Visitor {
     type Error;
+
+    fn visit<T: Visit>(&mut self, t: &T) -> VisitState<Self::Error> {
+        t.accept(self)
+    }
 
     fn visit_program(&mut self, prog: &Program) -> VisitState<Self::Error> {
         for decl in prog.decls.iter() {
@@ -331,12 +369,29 @@ impl<T: Write> Visitor for Dumper<T> {
     }
 }
 
-pub fn dump_program<T: Write>(w: T, prog: &Program) -> Result<(), io::Error> {
+pub fn dump<T: Write, N: Visit>(w: T, node: &N) -> Result<(), io::Error> {
     let mut dumper = Dumper::new(w);
-    dumper.visit_program(prog).into()
+    dumper.visit(node).into()
 }
 
-pub fn dump_expression<T: Write>(w: T, expr: &Expr) -> Result<(), io::Error> {
-    let mut dumper = Dumper::new(w);
-    dumper.visit_expr(expr).into()
+pub fn dump_to_string<N: Visit>(node: &N) -> String {
+    let mut buf = Vec::new();
+    {
+        let mut dumper = Dumper::new(&mut buf);
+        dumper.visit(node);
+    }
+    String::from_utf8_lossy(&buf).into()
+}
+
+#[test]
+fn test_dump_to_string() {
+    use position::DUMMY_POS;
+    let expr = Expr {
+        id: DUMMY_NODE_ID,
+        node: ExprKind::Literal(Literal::Int(0)),
+        pos: DUMMY_POS,
+    };
+    let actual = dump_to_string(&expr);
+    let expected = "int: 0\n";
+    assert_eq!(actual, expected);
 }

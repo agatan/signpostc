@@ -19,7 +19,7 @@ fn repl() {
 
         match parse_result {
             Ok(expr) => {
-                ast::dump_expression(io::stdout(), &expr).unwrap();
+                ast::dump(io::stdout(), &expr).unwrap();
             }
             Err(e) => {
                 println!("errors: {:?}", e);
@@ -40,7 +40,7 @@ fn main() {
         let parse_result = syntax::parse_file(&env::args().nth(1).unwrap(), &input);
         println!("{:?}", parse_result);
         if let Ok(prog) = parse_result {
-            ast::dump_program(io::stdout(), &prog).unwrap();
+            ast::dump(io::stdout(), &prog).unwrap();
         }
     }
 }
