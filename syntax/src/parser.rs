@@ -7,8 +7,7 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{NodeId, Program, Decl, DeclKind, Param, FunDecl, Ty, TyKind, Stmt, StmtKind, Expr,
-          ExprKind, Literal};
+use ast::*;
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -174,6 +173,7 @@ impl<'a> Parser<'a> {
         self.skip_newlines();
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
+            TokenKind::Struct => self.parse_struct_decl(),
             _ => {
                 let msg = format!("unexcepted token: {}", self.next_token);
                 Err(self.make_error(self.next_token, msg))
@@ -209,6 +209,57 @@ impl<'a> Parser<'a> {
         Ok(Decl::new(self.next_id(),
                      pos,
                      DeclKind::Def(FunDecl::new(name, type_params, params, ret_ty, body))))
+    }
+
+    fn parse_field(&mut self) -> Result<Field, Error> {
+        self.expect_without_newline(TokenKind::Ident)?;
+        let name = self.current_token.symbol();
+        self.expect_without_newline(TokenKind::Colon)?;
+        let ty = self.parse_type();
+        if self.expect_without_newline(TokenKind::Comma).is_err() &&
+           !self.next_is(TokenKind::Rbrace) {
+            let err = self.make_error(self.next_token,
+                                      format!("expected ',' or '}}'. found {}", self.next_token));
+            Err(err)
+        } else {
+            Ok(Field {
+                name: name,
+                ty: ty,
+            })
+        }
+    }
+
+    fn parse_fields(&mut self) -> Result<Vec<Field>, Error> {
+        self.expect_without_newline(TokenKind::Lbrace)?;
+        if self.expect_without_newline(TokenKind::Rbrace).is_ok() {
+            return Ok(Vec::new());
+        }
+        let mut fields = Vec::new();
+        while self.expect_without_newline(TokenKind::Rbrace).is_err() {
+            let field = self.parse_field()?;
+            fields.push(field);
+            if self.next_is(TokenKind::EOF) {
+                let err = self.make_error(self.next_token, "expected '}'. found 'EOF'".into());
+                return Err(err);
+            }
+        }
+        Ok(fields)
+    }
+
+    fn parse_struct_decl(&mut self) -> Result<Decl, Error> {
+        self.expect(TokenKind::Struct)?;
+        let pos = self.current_token.pos();
+        self.expect_without_newline(TokenKind::Uident)?;
+        let name = self.current_token.symbol();
+        let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
+        let fields = self.parse_fields()?;
+        Ok(Decl::new(self.next_id(),
+                     pos,
+                     DeclKind::Struct(Struct {
+                         name: name,
+                         type_params: type_params,
+                         fields: fields,
+                     })))
     }
 
     fn parse_param(&mut self) -> Result<Param, Error> {
@@ -596,7 +647,6 @@ impl Assoc {
 mod tests {
     use super::*;
     use position::{DUMMY_POS, File};
-    use ast::*;
     use symbol::Symbol;
 
     #[test]
