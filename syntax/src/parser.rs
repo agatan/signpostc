@@ -192,10 +192,8 @@ impl<'a> Parser<'a> {
         let pos = self.current_token.pos();
         self.expect_without_newline(TokenKind::Ident)?;
         let name = self.current_token.symbol();
-        // TODO(agatan): generics parameters
         let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
         let params = self.parse_params()?;
-        // TODO(agatan): return type spec
         let ret_ty = if self.expect_without_newline(TokenKind::Colon).is_ok() {
             Some(self.parse_type())
         } else {

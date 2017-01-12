@@ -61,7 +61,6 @@ pub struct FunDecl {
     pub type_params: Vec<Symbol>,
     pub params: Vec<Param>,
     pub ret: Option<Ty>,
-    // TODO(agatan): body should be `Vec<Stmt>`
     pub body: Expr,
 }
 
@@ -83,11 +82,19 @@ impl FunDecl {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    Unit,
-    Int(i64),
-    Bool(bool),
-    String(Symbol),
+pub struct Stmt {
+    pub id: NodeId,
+    pub node: StmtKind,
+    pub pos: Pos,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StmtKind {
+    Error,
+    /// expression without semicolon (returns value)
+    Expr(Expr),
+    /// expression with semicolon (discards value)
+    Semi(Expr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +142,14 @@ pub enum ExprKind {
     Ufcs(Box<Expr>, Symbol, Vec<Expr>),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Unit,
+    Int(i64),
+    Bool(bool),
+    String(Symbol),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinTy {
     Unit,
@@ -171,4 +186,3 @@ impl Ty {
         }
     }
 }
-

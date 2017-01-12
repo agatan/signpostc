@@ -57,9 +57,16 @@ pub trait Visitor {
                 if let Some(ref ret) = *ret {
                     visit!(self.visit_ty(ret));
                 }
-                visit!(self.visit_expr(body));
-                VisitState::Run
+                self.visit_expr(body)
             }
+        }
+    }
+
+    fn visit_stmt(&mut self, stmt: &Stmt) -> VisitState<Self::Error> {
+        match stmt.node {
+            StmtKind::Error => VisitState::Run,
+            StmtKind::Expr(ref e) |
+            StmtKind::Semi(ref e) => self.visit_expr(e),
         }
     }
 
