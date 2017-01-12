@@ -7,7 +7,8 @@ use symbol::Symbol;
 use position::{Pos, Position, File};
 use scanner::Scanner;
 use errors::{ErrorList, Error};
-use ast::{NodeId, Program, Decl, Param, FunDecl, Ty, TyKind, Expr, ExprKind, Literal};
+use ast::{NodeId, Program, Decl, Param, FunDecl, Ty, TyKind, Stmt, StmtKind, Expr, ExprKind,
+          Literal};
 
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -267,6 +268,24 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(params)
+    }
+
+    pub fn parse_stmt(&mut self) -> Stmt {
+        // TODO(agatan): currently, Stmt only consists of Expr.
+        let e = self.parse_expr();
+        let pos = e.pos;
+        let node = if self.expect(TokenKind::Semicolon).is_ok() {
+            StmtKind::Semi(e)
+        } else if self.expect(TokenKind::Newline).is_ok() {
+            StmtKind::Expr(e)
+        } else {
+            let err = self.make_error(self.next_token,
+                                      format!("unexpected token: {}. expected ',' or line break",
+                                              self.next_token));
+            self.annotate_error(err);
+            StmtKind::Error
+        };
+        Stmt::new(self.next_id(), pos, node)
     }
 
     pub fn parse_expr(&mut self) -> Expr {
@@ -554,7 +573,7 @@ impl Assoc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use position::File;
+    use position::{DUMMY_POS, File};
     use ast::*;
     use symbol::Symbol;
 
@@ -634,6 +653,20 @@ mod tests {
             for (p, expected) in fun_decl.type_params.iter().zip(names.into_iter()) {
                 assert_eq!(p.as_str(), expected);
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_stmt() {
+        let expected_expr = Expr::new(NodeId::new(1), DUMMY_POS, ExprKind::Literal(Literal::Int(1)));
+        let tests = vec![("1\n", StmtKind::Expr(expected_expr.clone())),
+                         ("1;", StmtKind::Semi(expected_expr.clone()))];
+        for (input, expected) in tests {
+            let file = File::new(None, input.len());
+            let mut parser = Parser::new(file, input);
+            let s = parser.parse_stmt();
+            test_parse_error(&parser);
+            assert_eq!(s.node, expected);
         }
     }
 

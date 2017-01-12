@@ -88,6 +88,16 @@ pub struct Stmt {
     pub pos: Pos,
 }
 
+impl Stmt {
+    pub fn new(id: NodeId, pos: Pos, node: StmtKind) -> Stmt {
+        Stmt {
+            id: id,
+            node: node,
+            pos: pos,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
     Error,
