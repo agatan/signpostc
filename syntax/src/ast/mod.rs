@@ -140,6 +140,8 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
     /// `x.method(args)`
     Ufcs(Box<Expr>, Symbol, Vec<Expr>),
+    /// `{ ... }`
+    Block(Vec<Stmt>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

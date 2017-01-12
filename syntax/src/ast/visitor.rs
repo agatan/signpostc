@@ -95,6 +95,12 @@ pub trait Visitor {
                 }
                 VisitState::Run
             }
+            ExprKind::Block(ref stmts) => {
+                for stmt in stmts {
+                    visit!(self.visit_stmt(stmt));
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -216,6 +222,18 @@ impl<T: Write> Visitor for Dumper<T> {
         }
     }
 
+    fn visit_stmt(&mut self, stmt: &Stmt) -> VisitState<Self::Error> {
+        match stmt.node {
+            StmtKind::Error => __try_dump!(self, "error:"),
+            StmtKind::Expr(ref e) => visit!(self.visit_expr(e)),
+            StmtKind::Semi(ref e) => {
+                __try_dump!(self, "semi:");
+                visit!(self.with_indent(|this| this.visit_expr(e)))
+            }
+        }
+        VisitState::Run
+    }
+
     fn visit_expr(&mut self, expr: &Expr) -> VisitState<Self::Error> {
         match expr.node {
             ExprKind::Error => __try_dump!(self, "error:"),
@@ -275,6 +293,15 @@ impl<T: Write> Visitor for Dumper<T> {
                         }
                         VisitState::Run
                     })
+                });
+            }
+            ExprKind::Block(ref stmts) => {
+                __try_dump!(self, "block:");
+                self.with_indent(|this| {
+                    for stmt in stmts {
+                        visit!(this.visit_stmt(stmt));
+                    }
+                    VisitState::Run
                 });
             }
         }
