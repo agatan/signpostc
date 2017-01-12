@@ -238,6 +238,7 @@ impl<'a> Parser<'a> {
         while self.expect_without_newline(TokenKind::Rbrace).is_err() {
             let field = self.parse_field()?;
             fields.push(field);
+            self.skip_newlines();
             if self.next_is(TokenKind::EOF) {
                 let err = self.make_error(self.next_token, "expected '}'. found 'EOF'".into());
                 return Err(err);
@@ -267,6 +268,12 @@ impl<'a> Parser<'a> {
         let name = self.current_token.symbol();
         self.expect_without_newline(TokenKind::Colon)?;
         let ty = self.parse_type();
+        if self.expect_without_newline(TokenKind::Comma).is_err() &&
+           !self.next_is(TokenKind::Rparen) {
+            let err = self.make_error(self.next_token,
+                                      format!("expected ',' or ')'. found {}", self.next_token));
+            return Err(err);
+        }
         Ok(Param::new(name, ty))
     }
 
@@ -277,16 +284,13 @@ impl<'a> Parser<'a> {
             return Ok(Vec::new());
         }
         let mut params = Vec::new();
-        loop {
+        while self.expect_without_newline(TokenKind::Rparen).is_err() {
             let param = self.parse_param()?;
             params.push(param);
-            if self.expect_without_newline(TokenKind::Rparen).is_ok() {
-                break;
-            }
-            self.expect_without_newline(TokenKind::Comma)?;
-            if self.expect_without_newline(TokenKind::Rparen).is_ok() {
-                // optional trailing comma.
-                break;
+            self.skip_newlines();
+            if self.next_is(TokenKind::EOF) {
+                let err = self.make_error(self.next_token, "expected ')'. found 'EOF'".into());
+                return Err(err);
             }
         }
         Ok(params)
@@ -452,6 +456,7 @@ impl<'a> Parser<'a> {
         while self.expect_without_newline(TokenKind::Rbrace).is_err() {
             let stmt = self.parse_stmt();
             stmts.push(stmt);
+            self.skip_newlines();
             if self.next_is(TokenKind::EOF) {
                 let err = self.make_error(self.next_token, "expected '}', found 'EOF'".into());
                 return Err(err);
