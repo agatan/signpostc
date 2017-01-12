@@ -250,28 +250,28 @@ impl<T: Write> Visitor for Dumper<T> {
             }
             ExprKind::Prefix(op, ref e) => {
                 __try_dump!(self, "prefix op:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     __try_dump!(this, "op: {}", op.as_str());
                     this.visit_expr(e)
-                });
+                }));
             }
             ExprKind::Infix(ref lhs, op, ref rhs) => {
                 __try_dump!(self, "infix op:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     __try_dump!(this, "op: {}", op.as_str());
                     visit!(this.visit_expr(lhs));
                     visit!(this.visit_expr(rhs));
                     VisitState::Run
-                });
+                }));
             }
             ExprKind::Paren(ref e) => {
                 visit!(self.visit_expr(e));
             }
             ExprKind::Call(ref f, ref args) => {
                 __try_dump!(self, "call:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     __try_dump!(this, "function:");
-                    this.with_indent(|this| this.visit_expr(f));
+                    visit!(this.with_indent(|this| this.visit_expr(f)));
                     __try_dump!(this, "arguments:");
                     this.with_indent(|this| {
                         for arg in args {
@@ -279,11 +279,11 @@ impl<T: Write> Visitor for Dumper<T> {
                         }
                         VisitState::Run
                     })
-                });
+                }));
             }
             ExprKind::Ufcs(ref base, fname, ref args) => {
                 __try_dump!(self, "ufcs:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     visit!(this.visit_expr(base));
                     __try_dump!(this, "name: {}", fname.as_str());
                     __try_dump!(this, "arguments:");
@@ -293,16 +293,16 @@ impl<T: Write> Visitor for Dumper<T> {
                         }
                         VisitState::Run
                     })
-                });
+                }));
             }
             ExprKind::Block(ref stmts) => {
                 __try_dump!(self, "block:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     for stmt in stmts {
                         visit!(this.visit_stmt(stmt));
                     }
                     VisitState::Run
-                });
+                }));
             }
         }
         VisitState::Run
@@ -315,7 +315,7 @@ impl<T: Write> Visitor for Dumper<T> {
             TyKind::Ident(ref name) => __try_dump!(self, "ident: {}", name.as_str()),
             TyKind::App(base, ref args) => {
                 __try_dump!(self, "app:");
-                self.with_indent(|this| {
+                visit!(self.with_indent(|this| {
                     __try_dump!(this, "base: {}", base.as_str());
                     __try_dump!(this, "args:");
                     this.with_indent(|this| {
@@ -324,7 +324,7 @@ impl<T: Write> Visitor for Dumper<T> {
                         }
                         VisitState::Run
                     })
-                });
+                }));
             }
         }
         VisitState::Run
