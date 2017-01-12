@@ -97,6 +97,12 @@ pub trait Visitor {
                 }
                 self.visit_expr(body)
             }
+            DeclKind::Struct(Struct { ref fields, .. }) => {
+                for f in fields {
+                    visit!(self.visit_ty(&f.ty));
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -229,23 +235,22 @@ impl<T: Write> Visitor for Dumper<T> {
                 VisitState::Run
             }
             DeclKind::Def(ref f) => {
-                __try_dump!(self, "def:");
+                __try_dump!(self, "def: {}", f.name.as_str());
                 self.with_indent(|this| {
-                    __try_dump!(this, "name: {}", f.name.as_str());
                     __try_dump!(this, "type_params:");
-                    this.with_indent(|this| {
+                    visit!(this.with_indent(|this| {
                         for ty in f.type_params.iter() {
-                            __try_dump!(this, "PARAM: {}", ty.as_str());
+                            __try_dump!(this, "name: {}", ty.as_str());
                         }
                         VisitState::Run
-                    });
+                    }));
                     __try_dump!(this, "params:");
-                    this.with_indent(|this| {
+                    visit!(this.with_indent(|this| {
                         for param in f.params.iter() {
                             visit!(this.dump_param(param));
                         }
                         VisitState::Run
-                    });
+                    }));
                     match f.ret {
                         Some(ref ty) => {
                             __try_dump!(this, "return:");
@@ -255,6 +260,28 @@ impl<T: Write> Visitor for Dumper<T> {
                     }
                     __try_dump!(this, "body:");
                     this.with_indent(|this| this.visit_expr(&f.body))
+                })
+            }
+            DeclKind::Struct(ref st) => {
+                __try_dump!(self, "struct: {}", st.name.as_str());
+                self.with_indent(|this| {
+                    __try_dump!(this, "type_params:");
+                    visit!(this.with_indent(|this| {
+                        for ty in st.type_params.iter() {
+                            __try_dump!(this, "name: {}", ty.as_str());
+                        }
+                        VisitState::Run
+                    }));
+                    __try_dump!(this, "fields:");
+                    visit!(this.with_indent(|this| {
+                        for f in st.fields.iter() {
+                            __try_dump!(this, "name: {}", f.name.as_str());
+                            __try_dump!(this, "type:");
+                            visit!(this.visit_ty(&f.ty));
+                        }
+                        VisitState::Run
+                    }));
+                    VisitState::Run
                 })
             }
         }

@@ -55,6 +55,7 @@ impl Decl {
 pub enum DeclKind {
     Error,
     Def(FunDecl),
+    Struct(Struct),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,6 +97,19 @@ impl FunDecl {
             body: body,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    pub name: Symbol,
+    pub ty: Ty,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Struct {
+    pub name: Symbol,
+    pub type_params: Vec<Symbol>,
+    pub fields: Vec<Field>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
