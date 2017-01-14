@@ -1,6 +1,12 @@
-data Option<T> = None | Some(T)
+enum Option<T> {
+    None,
+    Some(T),
+}
 
-data Result<T, E> = Ok(T) | Err(E)
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+}
 
 struct Person {
     name: String,

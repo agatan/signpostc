@@ -111,7 +111,7 @@ pub trait Visitor {
                 }
                 VisitState::Run
             }
-            DeclKind::Data(Data { ref variants, .. }) => {
+            DeclKind::Enum(Enum { ref variants, .. }) => {
                 for v in variants {
                     for t in &v.params {
                         visit!(self.visit_ty(t));
@@ -329,8 +329,8 @@ impl<T: Write> Visitor for Dumper<T> {
                     VisitState::Run
                 }
             }
-            DeclKind::Data(Data { name, ref type_params, ref variants }) => {
-                __try_dump!(self, "data: {}", name.as_str());
+            DeclKind::Enum(Enum { name, ref type_params, ref variants }) => {
+                __try_dump!(self, "enum: {}", name.as_str());
                 {
                     let mut w = self.enter();
                     __try_dump!(w, "type params:");

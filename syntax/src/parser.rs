@@ -58,7 +58,6 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::Uident, Self::parse_struct_expr);
 
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
-        parser.register_infix(TokenKind::Pipe, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Rangle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Lparen, Self::parse_call_expr);
@@ -165,7 +164,7 @@ impl<'a> Parser<'a> {
         loop {
             if self.next_is(TokenKind::Def) || self.next_is(TokenKind::Let) ||
                self.next_is(TokenKind::EOF) || self.next_is(TokenKind::Struct) ||
-               self.next_is(TokenKind::Data) {
+               self.next_is(TokenKind::Enum) {
                 break;
             }
             self.succ_token();
@@ -177,7 +176,7 @@ impl<'a> Parser<'a> {
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             TokenKind::Struct => self.parse_struct_decl(),
-            TokenKind::Data => self.parse_data_decl(),
+            TokenKind::Enum => self.parse_enum_decl(),
             _ => {
                 let msg = format!("expected declaration. found {}", self.next_token);
                 Err(self.make_error(self.next_token, msg))
@@ -284,38 +283,44 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        Ok(Variant {
-            pos: pos,
-            ident: ident,
-            params: params,
-        })
+        if self.expect_without_newline(TokenKind::Comma).is_err() &&
+           !self.next_is(TokenKind::Rbrace) {
+            let err = self.make_error(self.next_token,
+                                      format!("expected ',' or '}}'. found {}", self.next_token));
+            Err(err)
+        } else {
+            Ok(Variant {
+                pos: pos,
+                ident: ident,
+                params: params,
+            })
+        }
     }
 
     fn parse_variants(&mut self) -> Result<Vec<Variant>, Error> {
         let mut variants = Vec::new();
-        // optional leading '|'
-        let _ = self.expect_without_newline(TokenKind::Pipe);
-        loop {
+        self.expect_without_newline(TokenKind::Lbrace)?;
+        while self.expect_without_newline(TokenKind::Rbrace).is_err() {
             let v = self.parse_variant()?;
             variants.push(v);
-            if self.expect_without_newline(TokenKind::Pipe).is_err() {
+            self.skip_newlines();
+            if self.next_is(TokenKind::EOF) {
                 break;
             }
         }
         Ok(variants)
     }
 
-    fn parse_data_decl(&mut self) -> Result<Decl, Error> {
-        self.expect(TokenKind::Data)?;
+    fn parse_enum_decl(&mut self) -> Result<Decl, Error> {
+        self.expect(TokenKind::Enum)?;
         let pos = self.current_token.pos();
         self.expect_without_newline(TokenKind::Uident)?;
         let name = self.current_token.symbol();
         let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
-        self.expect_without_newline(TokenKind::Eq)?;
         let variants = self.parse_variants()?;
         Ok(Decl::new(self.next_id(),
                      pos,
-                     DeclKind::Data(Data {
+                     DeclKind::Enum(Enum {
                          name: name,
                          type_params: type_params,
                          variants: variants,
@@ -884,12 +889,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_data() {
+    fn test_parse_enum() {
         let input = r#"
-        data Option<T> = None | Some(T)
+        enum Option<T> { None, Some(T) }
         "#;
         let d = super::super::parse_decl(input).unwrap();
-        if let DeclKind::Data(Data { name, ref type_params, ref variants }) = d.node {
+        if let DeclKind::Enum(Enum { name, ref type_params, ref variants }) = d.node {
             assert_eq!(name.as_str(), "Option");
             assert_eq!(type_params.len(), 1);
             assert_eq!(type_params[0].as_str(), "T");
@@ -899,7 +904,7 @@ mod tests {
             assert_eq!(variants[1].ident.as_str(), "Some");
             assert_eq!(variants[1].params.len(), 1);
         } else {
-            panic!("d is not a data declaration, got = {:?}", d.node);
+            panic!("d is not a enum declaration, got = {:?}", d.node);
         }
     }
 
