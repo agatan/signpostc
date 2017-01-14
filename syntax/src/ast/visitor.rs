@@ -322,9 +322,8 @@ impl<T: Write> Visitor for Dumper<T> {
                     {
                         let mut w = w.enter();
                         for f in st.fields.iter() {
-                            __try_dump!(w, "name: {}", f.name.as_str());
-                            __try_dump!(w, "type:");
-                            visit!(w.visit_ty(&f.ty));
+                            __try_dump!(w, "{}:", f.name.as_str());
+                            visit!(w.enter().visit_ty(&f.ty));
                         }
                     }
                     VisitState::Run
@@ -466,7 +465,7 @@ impl<T: Write> Visitor for Dumper<T> {
         match ty.node {
             TyKind::Error => __try_dump!(self, "error:"),
             TyKind::Hole => __try_dump!(self, "_"),
-            TyKind::Ident(ref name) => __try_dump!(self, "ident: {}", name.as_str()),
+            TyKind::Ident(ref name) => __try_dump!(self, "{}", name.as_str()),
             TyKind::App(base, ref args) => {
                 __try_dump!(self, "app:");
                 {
