@@ -100,7 +100,7 @@ impl FunDecl {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Field {
+pub struct StructField {
     pub name: Symbol,
     pub ty: Ty,
 }
@@ -109,7 +109,7 @@ pub struct Field {
 pub struct Struct {
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
-    pub fields: Vec<Field>,
+    pub fields: Vec<StructField>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -183,6 +183,8 @@ pub enum ExprKind {
     Ufcs(Box<Expr>, Symbol, Vec<Expr>),
     /// `{ ... }`
     Block(Vec<Stmt>),
+    /// `Person(name: "bob", age: 23)`
+    Struct(Symbol, Vec<Field>)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -191,6 +193,13 @@ pub enum Literal {
     Int(i64),
     Bool(bool),
     String(Symbol),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    pub pos: Pos,
+    pub ident: Symbol,
+    pub expr: Expr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

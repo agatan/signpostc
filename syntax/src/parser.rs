@@ -55,6 +55,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::Operator, Self::parse_prefix_expr);
         parser.register_prefix(TokenKind::Lparen, Self::parse_paren_expr);
         parser.register_prefix(TokenKind::Lbrace, Self::parse_block_expr);
+        parser.register_prefix(TokenKind::Uident, Self::parse_struct_expr);
 
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
@@ -211,7 +212,7 @@ impl<'a> Parser<'a> {
                      DeclKind::Def(FunDecl::new(name, type_params, params, ret_ty, body))))
     }
 
-    fn parse_field(&mut self) -> Result<Field, Error> {
+    fn parse_struct_field(&mut self) -> Result<StructField, Error> {
         self.expect_without_newline(TokenKind::Ident)?;
         let name = self.current_token.symbol();
         self.expect_without_newline(TokenKind::Colon)?;
@@ -222,21 +223,21 @@ impl<'a> Parser<'a> {
                                       format!("expected ',' or '}}'. found {}", self.next_token));
             Err(err)
         } else {
-            Ok(Field {
+            Ok(StructField {
                 name: name,
                 ty: ty,
             })
         }
     }
 
-    fn parse_fields(&mut self) -> Result<Vec<Field>, Error> {
+    fn parse_struct_fields(&mut self) -> Result<Vec<StructField>, Error> {
         self.expect_without_newline(TokenKind::Lbrace)?;
         if self.expect_without_newline(TokenKind::Rbrace).is_ok() {
             return Ok(Vec::new());
         }
         let mut fields = Vec::new();
         while self.expect_without_newline(TokenKind::Rbrace).is_err() {
-            let field = self.parse_field()?;
+            let field = self.parse_struct_field()?;
             fields.push(field);
             self.skip_newlines();
             if self.next_is(TokenKind::EOF) {
@@ -253,7 +254,7 @@ impl<'a> Parser<'a> {
         self.expect_without_newline(TokenKind::Uident)?;
         let name = self.current_token.symbol();
         let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
-        let fields = self.parse_fields()?;
+        let fields = self.parse_struct_fields()?;
         Ok(Decl::new(self.next_id(),
                      pos,
                      DeclKind::Struct(Struct {
@@ -463,6 +464,55 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(Expr::new(self.next_id(), pos, ExprKind::Block(stmts)))
+    }
+
+    fn parse_field(&mut self) -> Result<Field, Error> {
+        self.expect_without_newline(TokenKind::Ident)?;
+        let pos = self.current_token.pos();
+        let ident = self.current_token.symbol();
+        self.expect(TokenKind::Colon)?;
+        let expr = self.parse_expr();
+        if self.expect(TokenKind::Comma).is_err() && !self.next_is(TokenKind::Rparen) {
+            let err = self.make_error(self.next_token,
+                                      format!("expected ',' or ')'. found {}", self.next_token));
+            Err(err)
+        } else {
+            Ok(Field {
+                pos: pos,
+                ident: ident,
+                expr: expr,
+            })
+        }
+    }
+
+    fn parse_fields(&mut self) -> Result<Vec<Field>, Error> {
+        self.expect(TokenKind::Lparen)?;
+        self.skip_newlines();
+        if self.next_is(TokenKind::Rparen) {
+            let err = self.make_error(self.next_token, "empty struct field is not allowed.".into());
+            return Err(err);
+        }
+        let mut fields = Vec::new();
+        while self.expect_without_newline(TokenKind::Rparen).is_err() {
+            let field = self.parse_field()?;
+            fields.push(field);
+            self.skip_newlines();
+            if self.next_is(TokenKind::EOF) {
+                let err = self.make_error(self.next_token, "expected ')'. found 'EOF'".into());
+                return Err(err);
+            }
+        }
+        Ok(fields)
+    }
+
+    fn parse_struct_expr(&mut self) -> Result<Expr, Error> {
+        self.expect(TokenKind::Uident)?;
+        let pos = self.current_token.pos();
+        let name = self.current_token.symbol();
+        // TODO(agatan): check `None` and `Some(1)` pattern.
+        // currently, this function can parse only struct expression like `Person(name: "bob")`.
+        let fields = self.parse_fields()?;
+        Ok(Expr::new(self.next_id(), pos, ExprKind::Struct(name, fields)))
     }
 
     fn parse_infix_expr(&mut self, left: Expr) -> Result<Expr, Error> {
@@ -800,6 +850,22 @@ mod tests {
             let mut parser = Parser::new(file, input);
             let e = parser.parse_expr();
             test_identifier(input, e);
+        }
+    }
+
+    #[test]
+    fn test_struct_expr() {
+        let input = r#"IntPair(first: 1, second: 2)"#;
+        let e = super::super::parse_expr(input).unwrap();
+        if let ExprKind::Struct(name, fields) = e.node {
+            assert_eq!(name.as_str(), "IntPair");
+            let expected_fields = vec![("first", 1), ("second", 2)];
+            for (f, (exp_name, exp_i)) in fields.into_iter().zip(expected_fields.into_iter()) {
+                assert_eq!(f.ident.as_str(), exp_name);
+                test_integer(exp_i, f.expr);
+            }
+        } else {
+            panic!("e is not a struct expression, got = {:?}", e);
         }
     }
 

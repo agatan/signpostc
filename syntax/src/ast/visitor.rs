@@ -153,6 +153,12 @@ pub trait Visitor {
                 }
                 VisitState::Run
             }
+            ExprKind::Struct(_, ref fields) => {
+                for f in fields {
+                    visit!(self.visit_expr(&f.expr));
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -349,18 +355,16 @@ impl<T: Write> Visitor for Dumper<T> {
                 __try_dump!(self, "ident: {}", name.as_str());
             }
             ExprKind::Prefix(op, ref e) => {
-                __try_dump!(self, "prefix op:");
+                __try_dump!(self, "prefix op: {}", op.as_str());
                 {
                     let mut w = self.enter();
-                    __try_dump!(w, "op: {}", op.as_str());
                     visit!(w.visit_expr(e))
                 }
             }
             ExprKind::Infix(ref lhs, op, ref rhs) => {
-                __try_dump!(self, "infix op:");
+                __try_dump!(self, "infix op: {}", op.as_str());
                 {
                     let mut w = self.enter();
-                    __try_dump!(w, "op: {}", op.as_str());
                     visit!(w.visit_expr(lhs));
                     visit!(w.visit_expr(rhs));
                 }
@@ -407,6 +411,19 @@ impl<T: Write> Visitor for Dumper<T> {
                     let mut w = self.enter();
                     for stmt in stmts {
                         visit!(w.visit_stmt(stmt));
+                    }
+                }
+            }
+            ExprKind::Struct(name, ref fields) => {
+                __try_dump!(self, "struct: {}", name.as_str());
+                {
+                    let mut w = self.enter();
+                    for f in fields {
+                        __try_dump!(w, "{}:", f.ident.as_str());
+                        {
+                            let mut w = w.enter();
+                            visit!(w.visit_expr(&f.expr));
+                        }
                     }
                 }
             }
