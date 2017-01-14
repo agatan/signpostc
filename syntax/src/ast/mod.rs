@@ -124,6 +124,7 @@ pub struct Variant {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Data {
     pub name: Symbol,
+    pub type_params: Vec<Symbol>,
     pub variants: Vec<Variant>,
 }
 

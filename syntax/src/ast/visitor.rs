@@ -330,10 +330,17 @@ impl<T: Write> Visitor for Dumper<T> {
                     VisitState::Run
                 }
             }
-            DeclKind::Data(Data { name, ref variants }) => {
+            DeclKind::Data(Data { name, ref type_params, ref variants }) => {
                 __try_dump!(self, "data: {}", name.as_str());
                 {
                     let mut w = self.enter();
+                    __try_dump!(w, "type params:");
+                    {
+                        let mut w = w.enter();
+                        for ty in type_params {
+                            __try_dump!(w, "name: {}", ty.as_str());
+                        }
+                    }
                     for v in variants {
                         __try_dump!(w, "{}:", v.ident.as_str());
                         {

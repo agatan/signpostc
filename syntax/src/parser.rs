@@ -58,6 +58,7 @@ impl<'a> Parser<'a> {
         parser.register_prefix(TokenKind::Uident, Self::parse_struct_expr);
 
         parser.register_infix(TokenKind::Operator, Self::parse_infix_expr);
+        parser.register_infix(TokenKind::Pipe, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Langle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Rangle, Self::parse_infix_expr);
         parser.register_infix(TokenKind::Lparen, Self::parse_call_expr);
@@ -175,6 +176,7 @@ impl<'a> Parser<'a> {
         let result = match self.next_token.kind() {
             TokenKind::Def => self.parse_def(),
             TokenKind::Struct => self.parse_struct_decl(),
+            TokenKind::Data => self.parse_data_decl(),
             _ => {
                 let msg = format!("unexcepted token: {}", self.next_token);
                 Err(self.make_error(self.next_token, msg))
@@ -261,6 +263,61 @@ impl<'a> Parser<'a> {
                          name: name,
                          type_params: type_params,
                          fields: fields,
+                     })))
+    }
+
+    fn parse_variant(&mut self) -> Result<Variant, Error> {
+        self.expect_without_newline(TokenKind::Uident)?;
+        let pos = self.current_token.pos();
+        let ident = self.current_token.symbol();
+        let mut params = Vec::new();
+        if self.next_is(TokenKind::Lparen) {
+            self.succ_token();
+            loop {
+                params.push(self.parse_type());
+                if self.next_is(TokenKind::Comma) {
+                    self.succ_token();
+                } else {
+                    self.expect(TokenKind::Rparen)?;
+                    break;
+                }
+            }
+        }
+        Ok(Variant {
+            pos: pos,
+            ident: ident,
+            params: params,
+        })
+    }
+
+    fn parse_variants(&mut self) -> Result<Vec<Variant>, Error> {
+        let mut variants = Vec::new();
+        // optional leading '|'
+        let _ = self.expect_without_newline(TokenKind::Pipe);
+        loop {
+            let v = self.parse_variant()?;
+            variants.push(v);
+            if self.expect_without_newline(TokenKind::Pipe).is_err() {
+                break;
+            }
+        }
+        Ok(variants)
+    }
+
+    fn parse_data_decl(&mut self) -> Result<Decl, Error> {
+        self.expect(TokenKind::Data)?;
+        let pos = self.current_token.pos();
+        self.expect_without_newline(TokenKind::Uident)?;
+        let name = self.current_token.symbol();
+        let type_params = self.parse_optional_type_params()?.unwrap_or(Vec::new());
+        self.expect_without_newline(TokenKind::Eq)?;
+        let variants = self.parse_variants()?;
+        Ok(Decl::new(self.next_id(),
+                     pos,
+                     DeclKind::Data(Data {
+                         name: name,
+                         type_params: type_params,
+                         variants: variants,
                      })))
     }
 
@@ -803,6 +860,26 @@ mod tests {
             }
         } else {
             panic!("d is not a struct declaration, got = {:?}", d.node);
+        }
+    }
+
+    #[test]
+    fn test_parse_data() {
+        let input = r#"
+        data Option<T> = None | Some(T)
+        "#;
+        let d = super::super::parse_decl(input).unwrap();
+        if let DeclKind::Data(Data { name, ref type_params, ref variants }) = d.node {
+            assert_eq!(name.as_str(), "Option");
+            assert_eq!(type_params.len(), 1);
+            assert_eq!(type_params[0].as_str(), "T");
+            assert_eq!(variants.len(), 2);
+            assert_eq!(variants[0].ident.as_str(), "None");
+            assert!(variants[0].params.is_empty());
+            assert_eq!(variants[1].ident.as_str(), "Some");
+            assert_eq!(variants[1].params.len(), 1);
+        } else {
+            panic!("d is not a data declaration, got = {:?}", d.node);
         }
     }
 

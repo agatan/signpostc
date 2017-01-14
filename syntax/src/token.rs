@@ -85,6 +85,7 @@ pub enum TokenKind {
     Operator,
 
     Eq,
+    Pipe,
 
     Arrow, // ->
     FatArrow, // =>
@@ -108,7 +109,7 @@ pub enum TokenKind {
     Def,
     Let,
     Struct,
-    Enum,
+    Data,
     Interface,
     Implement,
 
@@ -137,6 +138,7 @@ impl fmt::Display for TokenKind {
             Ident => "identifier",
             Operator => "operator",
             Eq => "'='",
+            Pipe => "'|'",
             Arrow => "'->'",
             FatArrow => "'=>'",
             Dot => "'.'",
@@ -154,7 +156,7 @@ impl fmt::Display for TokenKind {
             Def => "def",
             Let => "let",
             Struct => "struct",
-            Enum => "enum",
+            Data => "data",
             Interface => "interface",
             Implement => "implement",
             If => "if",
@@ -178,7 +180,7 @@ impl TokenKind {
             "def" => TokenKind::Def,
             "let" => TokenKind::Let,
             "struct" => TokenKind::Struct,
-            "enum" => TokenKind::Enum,
+            "data" => TokenKind::Data,
             "interface" => TokenKind::Interface,
             "implement" => TokenKind::Implement,
             "if" => TokenKind::If,
@@ -201,6 +203,7 @@ impl TokenKind {
             "<" => TokenKind::Langle,
             ">" => TokenKind::Rangle,
             ":" => TokenKind::Colon,
+            "|" => TokenKind::Pipe,
             _ => TokenKind::Operator,
         }
     }
