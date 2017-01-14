@@ -154,7 +154,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> Program {
         let mut decls = Vec::new();
-        while !self.next_is(TokenKind::EOF) {
+        while self.expect_without_newline(TokenKind::EOF).is_err() {
             decls.push(self.parse_decl());
         }
         Program { decls: decls }
@@ -164,7 +164,8 @@ impl<'a> Parser<'a> {
     fn sync_decl(&mut self) {
         loop {
             if self.next_is(TokenKind::Def) || self.next_is(TokenKind::Let) ||
-               self.next_is(TokenKind::EOF) {
+               self.next_is(TokenKind::EOF) || self.next_is(TokenKind::Struct) ||
+               self.next_is(TokenKind::Data) {
                 break;
             }
             self.succ_token();
@@ -178,7 +179,7 @@ impl<'a> Parser<'a> {
             TokenKind::Struct => self.parse_struct_decl(),
             TokenKind::Data => self.parse_data_decl(),
             _ => {
-                let msg = format!("unexcepted token: {}", self.next_token);
+                let msg = format!("expected declaration. found {}", self.next_token);
                 Err(self.make_error(self.next_token, msg))
             }
         };
@@ -386,10 +387,28 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
+    fn sync_stmt(&mut self) {
+        loop {
+            if self.next_is(TokenKind::Newline) || self.next_is(TokenKind::EOF) ||
+               self.next_is(TokenKind::Lbrace) ||
+               self.next_is(TokenKind::Semicolon) {
+                break;
+            }
+            self.succ_token();
+        }
+    }
+
     pub fn parse_stmt(&mut self) -> Stmt {
         // always in block expressions
         // TODO(agatan): currently, Stmt only consists of Expr.
-        let e = self.parse_expr();
+        let e = match self.parse_expr_(Assoc::lowest()) {
+            Ok(e) => e,
+            Err(e) => {
+                self.annotate_error(e);
+                self.sync_stmt();
+                Expr::error()
+            }
+        };
         let pos = e.pos;
         let node = if self.expect(TokenKind::Semicolon).is_ok() {
             StmtKind::Semi(e)
@@ -403,6 +422,7 @@ impl<'a> Parser<'a> {
                                       format!("unexpected token: {}. expected ',' or line break",
                                               self.next_token));
             self.annotate_error(err);
+            self.sync_stmt();
             StmtKind::Error
         };
         Stmt::new(self.next_id(), pos, node)
