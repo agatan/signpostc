@@ -56,6 +56,7 @@ pub enum DeclKind {
     Error,
     Def(FunDecl),
     Struct(Struct),
+    Data(Data),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -110,6 +111,20 @@ pub struct Struct {
     pub name: Symbol,
     pub type_params: Vec<Symbol>,
     pub fields: Vec<StructField>,
+}
+
+/// `Some(T)` or `None`
+#[derive(Debug, Clone, PartialEq)]
+pub struct Variant {
+    pub pos: Pos,
+    pub ident: Symbol,
+    pub params: Vec<Ty>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Data {
+    pub name: Symbol,
+    pub variants: Vec<Variant>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

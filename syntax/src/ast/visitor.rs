@@ -111,6 +111,14 @@ pub trait Visitor {
                 }
                 VisitState::Run
             }
+            DeclKind::Data(Data { ref variants, .. }) => {
+                for v in variants {
+                    for t in &v.params {
+                        visit!(self.visit_ty(t));
+                    }
+                }
+                VisitState::Run
+            }
         }
     }
 
@@ -321,6 +329,22 @@ impl<T: Write> Visitor for Dumper<T> {
                     }
                     VisitState::Run
                 }
+            }
+            DeclKind::Data(Data { name, ref variants }) => {
+                __try_dump!(self, "data: {}", name.as_str());
+                {
+                    let mut w = self.enter();
+                    for v in variants {
+                        __try_dump!(w, "{}:", v.ident.as_str());
+                        {
+                            let mut w = w.enter();
+                            for t in &v.params {
+                                visit!(w.visit_ty(t));
+                            }
+                        }
+                    }
+                }
+                VisitState::Run
             }
         }
     }
