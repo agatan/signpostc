@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use token::{Token, TokenKind};
 use symbol::Symbol;
@@ -9,10 +9,16 @@ use scanner::Scanner;
 use errors::{ErrorList, Error};
 use ast::*;
 
+#[derive(Debug, PartialEq, Clone, Default)]
+struct LookaheadBuffer {
+    buf: VecDeque<Token>,
+}
+
 pub struct Parser<'a> {
     scanner: Scanner<'a>,
     errors: Rc<RefCell<ErrorList>>,
 
+    lookahead_buffer: LookaheadBuffer,
     current_token: Token,
     next_token: Token,
 
@@ -37,6 +43,7 @@ impl<'a> Parser<'a> {
             scanner: sc,
             errors: errors,
 
+            lookahead_buffer: LookaheadBuffer::default(),
             current_token: cur_token,
             next_token: next_token,
 
@@ -115,9 +122,23 @@ impl<'a> Parser<'a> {
         self.scanner.file().position(pos)
     }
 
-    pub fn succ_token(&mut self) {
+    fn succ_token(&mut self) {
         self.current_token = self.next_token;
-        self.next_token = self.scanner.scan();
+        match self.lookahead_buffer.buf.pop_front() {
+            Some(t) => self.next_token = t,
+            None => self.next_token = self.scanner.scan(),
+        }
+    }
+
+    fn look_ahead<F, R>(&mut self, dist: usize, f: F) -> R
+        where F: FnOnce(&Token) -> R
+    {
+        debug_assert!(0 < dist && dist < 4);
+        while self.lookahead_buffer.buf.len() <= dist {
+            let tok = self.scanner.scan();
+            self.lookahead_buffer.buf.push_back(tok);
+        }
+        f(&self.lookahead_buffer.buf[dist])
     }
 
     fn skip_newlines(&mut self) {
